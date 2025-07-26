@@ -1,6 +1,9 @@
 // Copyright (C) 2020-2025, Lux Industries Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+//go:build ignore
+// +build ignore
+
 package log
 
 import "io"
@@ -15,11 +18,11 @@ func NewNoOpLogger() Logger {
 	return &noopLogger{level: InfoLevel}
 }
 
-func (n *noopLogger) Debug(msg string, fields ...Field)  {}
-func (n *noopLogger) Info(msg string, fields ...Field)   {}
-func (n *noopLogger) Warn(msg string, fields ...Field)   {}
-func (n *noopLogger) Error(msg string, fields ...Field)  {}
-func (n *noopLogger) Fatal(msg string, fields ...Field)  {}
+func (n *noopLogger) Debug(msg string, fields ...Field) {}
+func (n *noopLogger) Info(msg string, fields ...Field)  {}
+func (n *noopLogger) Warn(msg string, fields ...Field)  {}
+func (n *noopLogger) Error(msg string, fields ...Field) {}
+func (n *noopLogger) Fatal(msg string, fields ...Field) {}
 
 func (n *noopLogger) Debugf(format string, args ...interface{}) {}
 func (n *noopLogger) Infof(format string, args ...interface{})  {}
