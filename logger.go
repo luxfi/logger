@@ -1,106 +1,184 @@
-// Copyright (C) 2020-2025, Lux Industries Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package log
 
 import (
-	"io"
+	"context"
+	"log/slog"
+	"math"
+	"os"
+	"runtime"
+	"time"
 )
 
-// Level represents the severity of a log message
-type Level int
+const errorKey = "LOG_ERROR"
 
 const (
-	DebugLevel Level = iota
-	InfoLevel
-	WarnLevel
-	ErrorLevel
-	FatalLevel
+	legacyLevelCrit = iota
+	legacyLevelError
+	legacyLevelWarn
+	legacyLevelInfo
+	legacyLevelDebug
+	legacyLevelTrace
 )
 
-// Logger defines the interface for logging
+const (
+	levelMaxVerbosity slog.Level = math.MinInt
+	LevelTrace        slog.Level = -8
+	LevelDebug                   = slog.LevelDebug
+	LevelInfo                    = slog.LevelInfo
+	LevelWarn                    = slog.LevelWarn
+	LevelError                   = slog.LevelError
+	LevelCrit         slog.Level = 12
+)
+
+// LevelAlignedString returns a 5-character string containing the name of a Level.
+func LevelAlignedString(l slog.Level) string {
+	switch l {
+	case LevelTrace:
+		return "TRACE"
+	case slog.LevelDebug:
+		return "DEBUG"
+	case slog.LevelInfo:
+		return "INFO "
+	case slog.LevelWarn:
+		return "WARN "
+	case slog.LevelError:
+		return "ERROR"
+	case LevelCrit:
+		return "CRIT "
+	default:
+		return "unknown level"
+	}
+}
+
+// LevelString returns a string containing the name of a Level.
+func LevelString(l slog.Level) string {
+	switch l {
+	case LevelTrace:
+		return "trace"
+	case slog.LevelDebug:
+		return "debug"
+	case slog.LevelInfo:
+		return "info"
+	case slog.LevelWarn:
+		return "warn"
+	case slog.LevelError:
+		return "error"
+	case LevelCrit:
+		return "crit"
+	default:
+		return "unknown"
+	}
+}
+
+// A Logger writes key/value pairs to a Handler
 type Logger interface {
-	// Basic logging methods
-	Debug(msg string, fields ...Field)
-	Info(msg string, fields ...Field)
-	Warn(msg string, fields ...Field)
-	Error(msg string, fields ...Field)
-	Fatal(msg string, fields ...Field)
+	// With returns a new Logger that has this logger's attributes plus the given attributes
+	With(ctx ...interface{}) Logger
 
-	// Formatted logging methods
-	Debugf(format string, args ...interface{})
-	Infof(format string, args ...interface{})
-	Warnf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
+	// New returns a new Logger that has this logger's attributes plus the given attributes. Identical to 'With'.
+	New(ctx ...interface{}) Logger
 
-	// Create sub-logger with additional context
-	With(fields ...Field) Logger
-	Named(name string) Logger
+	// Log logs a message at the specified level with context key/value pairs
+	Log(level slog.Level, msg string, ctx ...interface{})
 
-	// Control methods
-	SetLevel(level Level)
-	GetLevel() Level
-	SetOutput(w io.Writer)
+	// Trace log a message at the trace level with context key/value pairs
+	Trace(msg string, ctx ...interface{})
+
+	// Debug logs a message at the debug level with context key/value pairs
+	Debug(msg string, ctx ...interface{})
+
+	// Info logs a message at the info level with context key/value pairs
+	Info(msg string, ctx ...interface{})
+
+	// Warn logs a message at the warn level with context key/value pairs
+	Warn(msg string, ctx ...interface{})
+
+	// Error logs a message at the error level with context key/value pairs
+	Error(msg string, ctx ...interface{})
+
+	// Crit logs a message at the crit level with context key/value pairs, and exits
+	Crit(msg string, ctx ...interface{})
+
+	// Write logs a message at the specified level
+	Write(level slog.Level, msg string, attrs ...any)
+
+	// Enabled reports whether l emits log records at the given context and level.
+	Enabled(ctx context.Context, level slog.Level) bool
+
+	// Handler returns the underlying handler of the inner logger.
+	Handler() slog.Handler
 }
 
-// Field represents a key-value pair for structured logging
-type Field struct {
-	Key   string
-	Value interface{}
+type logger struct {
+	inner *slog.Logger
 }
 
-// String creates a string field
-func String(key, val string) Field {
-	return Field{Key: key, Value: val}
+// NewLogger returns a logger with the specified handler set
+func NewLogger(h slog.Handler) Logger {
+	return &logger{
+		slog.New(h),
+	}
 }
 
-// Int creates an int field
-func Int(key string, val int) Field {
-	return Field{Key: key, Value: val}
+func (l *logger) Handler() slog.Handler {
+	return l.inner.Handler()
 }
 
-// Error creates an error field
-func Error(err error) Field {
-	return Field{Key: "error", Value: err}
+// Write logs a message at the specified level.
+func (l *logger) Write(level slog.Level, msg string, attrs ...any) {
+	if !l.inner.Enabled(context.Background(), level) {
+		return
+	}
+
+	var pcs [1]uintptr
+	runtime.Callers(3, pcs[:])
+
+	if len(attrs)%2 != 0 {
+		attrs = append(attrs, nil, errorKey, "Normalized odd number of arguments by adding nil")
+	}
+	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
+	r.Add(attrs...)
+	l.inner.Handler().Handle(context.Background(), r)
 }
 
-// Any creates a field with any value
-func Any(key string, val interface{}) Field {
-	return Field{Key: key, Value: val}
+func (l *logger) Log(level slog.Level, msg string, attrs ...any) {
+	l.Write(level, msg, attrs...)
 }
 
-// Factory creates new logger instances
-type Factory interface {
-	// Create a new logger
-	New(name string) Logger
-	
-	// Create a new logger with fields
-	NewWithFields(name string, fields ...Field) Logger
-	
-	// Get the root logger
-	Root() Logger
+func (l *logger) With(ctx ...interface{}) Logger {
+	return &logger{l.inner.With(ctx...)}
 }
 
-// Global factory instance
-var defaultFactory Factory = NewNoOpFactory()
-
-// SetFactory sets the global logger factory
-func SetFactory(factory Factory) {
-	defaultFactory = factory
+func (l *logger) New(ctx ...interface{}) Logger {
+	return l.With(ctx...)
 }
 
-// New creates a new logger using the global factory
-func New(name string) Logger {
-	return defaultFactory.New(name)
+// Enabled reports whether l emits log records at the given context and level.
+func (l *logger) Enabled(ctx context.Context, level slog.Level) bool {
+	return l.inner.Enabled(ctx, level)
 }
 
-// NewWithFields creates a new logger with fields using the global factory
-func NewWithFields(name string, fields ...Field) Logger {
-	return defaultFactory.NewWithFields(name, fields...)
+func (l *logger) Trace(msg string, ctx ...interface{}) {
+	l.Write(LevelTrace, msg, ctx...)
 }
 
-// Root returns the root logger
-func Root() Logger {
-	return defaultFactory.Root()
+func (l *logger) Debug(msg string, ctx ...interface{}) {
+	l.Write(slog.LevelDebug, msg, ctx...)
+}
+
+func (l *logger) Info(msg string, ctx ...interface{}) {
+	l.Write(slog.LevelInfo, msg, ctx...)
+}
+
+func (l *logger) Warn(msg string, ctx ...any) {
+	l.Write(slog.LevelWarn, msg, ctx...)
+}
+
+func (l *logger) Error(msg string, ctx ...interface{}) {
+	l.Write(slog.LevelError, msg, ctx...)
+}
+
+func (l *logger) Crit(msg string, ctx ...interface{}) {
+	l.Write(LevelCrit, msg, ctx...)
+	os.Exit(1)
 }

@@ -1,114 +1,191 @@
-// Copyright (C) 2020-2025, Lux Industries Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package log
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"math/big"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/holiman/uint256"
 )
 
-func TestNoOpLogger(t *testing.T) {
-	logger := NewNoOpLogger()
-	
-	// These should not panic
-	logger.Debug("debug message")
-	logger.Info("info message")
-	logger.Warn("warn message")
-	logger.Error("error message")
-	
-	logger.Debugf("debug %s", "formatted")
-	logger.Infof("info %s", "formatted")
-	logger.Warnf("warn %s", "formatted")
-	logger.Errorf("error %s", "formatted")
-	
-	// Test chaining
-	logger.With(String("key", "value")).Named("test").Info("chained")
-	
-	// Test level
-	logger.SetLevel(DebugLevel)
-	if logger.GetLevel() != DebugLevel {
-		t.Errorf("expected debug level, got %v", logger.GetLevel())
+// TestLoggingWithVmodule checks that vmodule works.
+func TestLoggingWithVmodule(t *testing.T) {
+	out := new(bytes.Buffer)
+	glog := NewGlogHandler(NewTerminalHandlerWithLevel(out, LevelTrace, false))
+	glog.Verbosity(LevelCrit)
+	logger := NewLogger(glog)
+	logger.Warn("This should not be seen", "ignored", "true")
+	glog.Vmodule("logger_test.go=5")
+	logger.Trace("a message", "foo", "bar")
+	have := out.String()
+	// The timestamp is locale-dependent, so we want to trim that off
+	// "INFO [01-01|00:00:00.000] a message ..." -> "a message..."
+	have = strings.Split(have, "]")[1]
+	want := " a message                                foo=bar\n"
+	if have != want {
+		t.Errorf("\nhave: %q\nwant: %q\n", have, want)
 	}
 }
 
-func TestNoOpFactory(t *testing.T) {
-	factory := NewNoOpFactory()
-	
-	logger1 := factory.New("test1")
-	logger2 := factory.NewWithFields("test2", String("key", "value"))
-	root := factory.Root()
-	
-	// These should not panic
-	logger1.Info("logger1")
-	logger2.Info("logger2")
-	root.Info("root")
-}
-
-func TestZapLogger(t *testing.T) {
-	// Test with default config
-	config := DefaultZapConfig()
-	logger, err := NewZapLogger(config)
-	if err != nil {
-		t.Fatalf("failed to create zap logger: %v", err)
-	}
-	
-	// These should not panic
-	logger.Debug("debug message")
-	logger.Info("info message")
-	logger.Warn("warn message")
-	logger.Error("error message")
-	
-	logger.Debugf("debug %s", "formatted")
-	logger.Infof("info %s", "formatted")
-	logger.Warnf("warn %s", "formatted")
-	logger.Errorf("error %s", "formatted")
-	
-	// Test chaining
-	logger.With(String("key", "value")).Named("test").Info("chained")
-	
-	// Test level
-	logger.SetLevel(DebugLevel)
-	if logger.GetLevel() != DebugLevel {
-		t.Errorf("expected debug level, got %v", logger.GetLevel())
+func TestTerminalHandlerWithAttrs(t *testing.T) {
+	out := new(bytes.Buffer)
+	glog := NewGlogHandler(NewTerminalHandlerWithLevel(out, LevelTrace, false).WithAttrs([]slog.Attr{slog.String("baz", "bat")}))
+	glog.Verbosity(LevelTrace)
+	logger := NewLogger(glog)
+	logger.Trace("a message", "foo", "bar")
+	have := out.String()
+	// The timestamp is locale-dependent, so we want to trim that off
+	// "INFO [01-01|00:00:00.000] a message ..." -> "a message..."
+	have = strings.Split(have, "]")[1]
+	want := " a message                                baz=bat foo=bar\n"
+	if have != want {
+		t.Errorf("\nhave: %q\nwant: %q\n", have, want)
 	}
 }
 
-func TestZapFactory(t *testing.T) {
-	config := DefaultZapConfig()
-	factory, err := NewZapFactory(config)
-	if err != nil {
-		t.Fatalf("failed to create zap factory: %v", err)
+// Make sure the default json handler outputs debug log lines
+func TestJSONHandler(t *testing.T) {
+	out := new(bytes.Buffer)
+	handler := JSONHandler(out)
+	logger := slog.New(handler)
+	logger.Debug("hi there")
+	if len(out.String()) == 0 {
+		t.Error("expected non-empty debug log output from default JSON Handler")
 	}
-	
-	logger1 := factory.New("test1")
-	logger2 := factory.NewWithFields("test2", String("key", "value"))
-	root := factory.Root()
-	
-	// These should not panic
-	logger1.Info("logger1")
-	logger2.Info("logger2")
-	root.Info("root")
+
+	out.Reset()
+	handler = JSONHandlerWithLevel(out, slog.LevelInfo)
+	logger = slog.New(handler)
+	logger.Debug("hi there")
+	if len(out.String()) != 0 {
+		t.Errorf("expected empty debug log output, but got: %v", out.String())
+	}
 }
 
-func TestFields(t *testing.T) {
-	// Test field constructors
-	strField := String("key", "value")
-	if strField.Key != "key" || strField.Value != "value" {
-		t.Error("String field mismatch")
+func BenchmarkTraceLogging(b *testing.B) {
+	SetDefault(NewLogger(NewTerminalHandler(io.Discard, true)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Trace("a message", "v", i)
 	}
-	
-	intField := Int("count", 42)
-	if intField.Key != "count" || intField.Value != 42 {
-		t.Error("Int field mismatch")
+}
+
+func BenchmarkTerminalHandler(b *testing.B) {
+	l := NewLogger(NewTerminalHandler(io.Discard, false))
+	benchmarkLogger(b, l)
+}
+func BenchmarkLogfmtHandler(b *testing.B) {
+	l := NewLogger(LogfmtHandler(io.Discard))
+	benchmarkLogger(b, l)
+}
+
+func BenchmarkJSONHandler(b *testing.B) {
+	l := NewLogger(JSONHandler(io.Discard))
+	benchmarkLogger(b, l)
+}
+
+func benchmarkLogger(b *testing.B, l Logger) {
+	var (
+		bb     = make([]byte, 10)
+		tt     = time.Now()
+		bigint = big.NewInt(100)
+		nilbig *big.Int
+		err    = errors.New("oh nooes it's crap")
+	)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l.Info("This is a message",
+			"foo", int16(i),
+			"bytes", bb,
+			"bonk", "a string with text",
+			"time", tt,
+			"bigint", bigint,
+			"nilbig", nilbig,
+			"err", err)
 	}
-	
-	errField := Error(nil)
-	if errField.Key != "error" || errField.Value != nil {
-		t.Error("Error field mismatch")
+	b.StopTimer()
+}
+
+func TestLoggerOutput(t *testing.T) {
+	type custom struct {
+		A string
+		B int8
 	}
-	
-	anyField := Any("data", struct{}{})
-	if anyField.Key != "data" {
-		t.Error("Any field mismatch")
+	var (
+		customA   = custom{"Foo", 12}
+		customB   = custom{"Foo\nLinebreak", 122}
+		bb        = make([]byte, 10)
+		tt        = time.Time{}
+		bigint    = big.NewInt(100)
+		nilbig    *big.Int
+		err       = errors.New("oh nooes it's crap")
+		smallUint = uint256.NewInt(500_000)
+		bigUint   = &uint256.Int{0xff, 0xff, 0xff, 0xff}
+	)
+
+	out := new(bytes.Buffer)
+	glogHandler := NewGlogHandler(NewTerminalHandler(out, false))
+	glogHandler.Verbosity(LevelInfo)
+	NewLogger(glogHandler).Info("This is a message",
+		"foo", int16(123),
+		"bytes", bb,
+		"bonk", "a string with text",
+		"time", tt,
+		"bigint", bigint,
+		"nilbig", nilbig,
+		"err", err,
+		"struct", customA,
+		"struct", customB,
+		"ptrstruct", &customA,
+		"smalluint", smallUint,
+		"bigUint", bigUint)
+
+	have := out.String()
+	t.Logf("output %v", out.String())
+	want := `INFO [11-07|19:14:33.821] This is a message                        foo=123 bytes="[0 0 0 0 0 0 0 0 0 0]" bonk="a string with text" time=0001-01-01T00:00:00+0000 bigint=100 nilbig=<nil> err="oh nooes it's crap" struct="{A:Foo B:12}" struct="{A:Foo\nLinebreak B:122}" ptrstruct="&{A:Foo B:12}" smalluint=500,000 bigUint=1,600,660,942,523,603,594,864,898,306,482,794,244,293,965,082,972,225,630,372,095
+`
+	if !bytes.Equal([]byte(have)[25:], []byte(want)[25:]) {
+		t.Errorf("Error\nhave: %q\nwant: %q", have, want)
+	}
+}
+
+const termTimeFormat = "01-02|15:04:05.000"
+
+func BenchmarkAppendFormat(b *testing.B) {
+	var now = time.Now()
+	b.Run("fmt time.Format", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			fmt.Fprintf(io.Discard, "%s", now.Format(termTimeFormat))
+		}
+	})
+	b.Run("time.AppendFormat", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			now.AppendFormat(nil, termTimeFormat)
+		}
+	})
+	var buf = new(bytes.Buffer)
+	b.Run("time.Custom", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			writeTimeTermFormat(buf, now)
+			buf.Reset()
+		}
+	})
+}
+
+func TestTermTimeFormat(t *testing.T) {
+	var now = time.Now()
+	want := now.AppendFormat(nil, termTimeFormat)
+	var b = new(bytes.Buffer)
+	writeTimeTermFormat(b, now)
+	have := b.Bytes()
+	if !bytes.Equal(have, want) {
+		t.Errorf("have != want\nhave: %q\nwant: %q\n", have, want)
 	}
 }
