@@ -1,26 +1,9 @@
 package log
 
-import "log/slog"
-
-// Level is the level for logging.
-type Level = slog.Level
-
 // Field is a key/value pair for structured logging.
 type Field struct {
 	Key   string
 	Value any
-}
-
-// Factory produces loggers.
-type Factory interface {
-	// New returns a new Logger with the given name.
-	New(name string) Logger
-
-	// NewWithFields returns a new Logger with the given name and initial fields.
-	NewWithFields(name string, fields ...Field) Logger
-
-	// Root returns the root Logger from this factory.
-	Root() Logger
 }
 
 // Level aliases for convenience.
