@@ -16,7 +16,7 @@ func init() {
 	config.Encoding = "console"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	
+
 	logger, _ := config.Build()
 	globalLogger = NewZapLogger(logger)
 }

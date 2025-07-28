@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 	"gopkg.in/natefinch/lumberjack.v2"
-	
+
 	"github.com/luxfi/log/level"
 )
 
@@ -200,7 +200,7 @@ var (
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 	jsonEncoderConfig zapcore.EncoderConfig
-	termTimeEncoder = zapcore.TimeEncoderOfLayout(termTimeFormat)
+	termTimeEncoder   = zapcore.TimeEncoderOfLayout(termTimeFormat)
 )
 
 func init() {
@@ -277,9 +277,9 @@ func NewWrappedCore(lvl Level, writer zapcore.WriteSyncer, encoder zapcore.Encod
 	atomicLevel := zap.NewAtomicLevelAt(toZapLevel(lvl))
 	core := zapcore.NewCore(encoder, writer, atomicLevel)
 	return &WrappedCore{
-		Core:         core,
-		AtomicLevel:  atomicLevel,
-		Writer:       writer,
+		Core:           core,
+		AtomicLevel:    atomicLevel,
+		Writer:         writer,
 		WriterDisabled: false,
 	}
 }
@@ -347,16 +347,16 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 		Compress:   config.Compress,
 	}
 	fileCore := NewWrappedCore(config.LogLevel, zapcore.AddSync(rw), fileEnc)
-	
+
 	// Combine cores with prefix if needed
 	cores := []zapcore.Core{consoleCore, fileCore}
 	core := zapcore.NewTee(cores...)
-	
+
 	zapLogger := zap.New(core)
 	if config.MsgPrefix != "" {
 		zapLogger = zapLogger.Named(config.MsgPrefix)
 	}
-	
+
 	l := NewZapLogger(zapLogger)
 	f.loggers[config.LoggerName] = logWrapper{
 		logger:       l,

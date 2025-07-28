@@ -8,22 +8,21 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	
+
 	"github.com/luxfi/log/level"
 )
 
 // Re-export slog levels for compatibility
 const (
 	LevelTrace slog.Level = -8
-	LevelDebug           = slog.LevelDebug
-	LevelInfo            = slog.LevelInfo
-	LevelWarn            = slog.LevelWarn
-	LevelError           = slog.LevelError
+	LevelDebug            = slog.LevelDebug
+	LevelInfo             = slog.LevelInfo
+	LevelWarn             = slog.LevelWarn
+	LevelError            = slog.LevelError
 	LevelCrit  slog.Level = 12
-	LevelFatal slog.Level = 16 // Added for Fatal
+	LevelFatal slog.Level = 16  // Added for Fatal
 	LevelVerbo slog.Level = -10 // Added for Verbo (most verbose)
 )
-
 
 // Logger interface that supports both the geth-style interface and zap fields
 type Logger interface {
@@ -53,16 +52,16 @@ type Logger interface {
 	RecoverAndPanic(f func())
 	RecoverAndExit(f, exit func())
 	Stop()
-	
+
 	// io.Writer
 	io.Writer
 }
 
 // zapLogger wraps zap.Logger to implement our Logger interface
 type zapLogger struct {
-	logger *zap.Logger
-	sugar  *zap.SugaredLogger
-	level  *zap.AtomicLevel
+	logger  *zap.Logger
+	sugar   *zap.SugaredLogger
+	level   *zap.AtomicLevel
 	handler slog.Handler // For compatibility
 }
 
@@ -83,14 +82,13 @@ func WriterAt(logger Logger, level slog.Level) io.Writer {
 	return &LoggerWriter{logger: logger, level: level}
 }
 
-
 // NewZapLogger creates a logger directly from a zap logger
 func NewZapLogger(logger *zap.Logger) Logger {
 	level := zap.NewAtomicLevelAt(zapcore.InfoLevel)
 	return &zapLogger{
-		logger: logger,
-		sugar:  logger.Sugar(),
-		level:  &level,
+		logger:  logger,
+		sugar:   logger.Sugar(),
+		level:   &level,
 		handler: nil,
 	}
 }
@@ -100,13 +98,12 @@ func (l *zapLogger) Handler() slog.Handler {
 	return l.handler
 }
 
-
 // With adds context fields (variadic key-value pairs)
 func (l *zapLogger) With(ctx ...interface{}) Logger {
 	if len(ctx) == 0 {
 		return l
 	}
-	
+
 	// Convert ctx to zap fields
 	fields := make([]zap.Field, 0, len(ctx)/2)
 	for i := 0; i < len(ctx)-1; i += 2 {
@@ -116,11 +113,11 @@ func (l *zapLogger) With(ctx ...interface{}) Logger {
 		}
 		fields = append(fields, zap.Any(key, ctx[i+1]))
 	}
-	
+
 	return &zapLogger{
-		logger: l.logger.With(fields...),
-		sugar:  l.logger.With(fields...).Sugar(),
-		level:  l.level,
+		logger:  l.logger.With(fields...),
+		sugar:   l.logger.With(fields...).Sugar(),
+		level:   l.level,
 		handler: l.handler,
 	}
 }
@@ -133,9 +130,9 @@ func (l *zapLogger) New(ctx ...interface{}) Logger {
 // WithFields adds zap fields
 func (l *zapLogger) WithFields(fields ...zap.Field) Logger {
 	return &zapLogger{
-		logger: l.logger.With(fields...),
-		sugar:  l.logger.With(fields...).Sugar(),
-		level:  l.level,
+		logger:  l.logger.With(fields...),
+		sugar:   l.logger.With(fields...).Sugar(),
+		level:   l.level,
 		handler: l.handler,
 	}
 }
@@ -143,9 +140,9 @@ func (l *zapLogger) WithFields(fields ...zap.Field) Logger {
 // WithOptions applies zap options
 func (l *zapLogger) WithOptions(opts ...zap.Option) Logger {
 	return &zapLogger{
-		logger: l.logger.WithOptions(opts...),
-		sugar:  l.logger.WithOptions(opts...).Sugar(),
-		level:  l.level,
+		logger:  l.logger.WithOptions(opts...),
+		sugar:   l.logger.WithOptions(opts...).Sugar(),
+		level:   l.level,
 		handler: l.handler,
 	}
 }
@@ -359,7 +356,7 @@ func init() {
 	config.Encoding = "console"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	
+
 	logger, _ := config.Build()
 	root = NewZapLogger(logger)
 }
@@ -373,7 +370,6 @@ func Root() Logger {
 func SetDefault(l Logger) {
 	root = l
 }
-
 
 // Helper functions for formatting
 

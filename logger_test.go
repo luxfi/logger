@@ -92,7 +92,7 @@ func (l *slogBridgeLogger) WriteLog(level slog.Level, msg string, attrs ...any) 
 		}
 		slogAttrs = append(slogAttrs, slog.Any(key, attrs[i+1]))
 	}
-	
+
 	l.slogger.LogAttrs(context.Background(), level, msg, slogAttrs...)
 }
 

@@ -3,7 +3,7 @@ package log
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	
+
 	"github.com/luxfi/log/level"
 )
 
@@ -33,7 +33,7 @@ func NewTestLogger(lvl Level) Logger {
 	config.Encoding = "console"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	
+
 	logger, _ := config.Build()
 	return NewZapLogger(logger)
 }
