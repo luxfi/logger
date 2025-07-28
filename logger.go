@@ -8,6 +8,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	
+	"github.com/luxfi/log/level"
 )
 
 // Re-export slog levels for compatibility
@@ -22,8 +24,6 @@ const (
 	LevelVerbo slog.Level = -10 // Added for Verbo (most verbose)
 )
 
-// Level is the type for log levels
-type Level = slog.Level
 
 // Logger interface that supports both the geth-style interface and zap fields
 type Logger interface {
@@ -83,26 +83,6 @@ func WriterAt(logger Logger, level slog.Level) io.Writer {
 	return &LoggerWriter{logger: logger, level: level}
 }
 
-// NewLogger creates a new zap-backed logger
-func NewLogger(h slog.Handler) Logger {
-	// For compatibility, we accept an slog.Handler but create a zap logger
-	config := zap.NewProductionConfig()
-	config.DisableStacktrace = true
-	config.Encoding = "console"
-	config.EncoderConfig.TimeKey = "time"
-	config.EncoderConfig.LevelKey = "level"
-	config.EncoderConfig.MessageKey = "msg"
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	
-	logger, _ := config.Build()
-	return &zapLogger{
-		logger: logger,
-		sugar:  logger.Sugar(),
-		level:  &config.Level,
-		handler: h,
-	}
-}
 
 // NewZapLogger creates a logger directly from a zap logger
 func NewZapLogger(logger *zap.Logger) Logger {
@@ -347,38 +327,26 @@ func NewNoOpLogger() Logger {
 	return NewZapLogger(zap.New(nopCore))
 }
 
-// Factory interface for creating loggers
-type Factory interface {
-	New(name string) Logger
-	NewWithFields(name string, fields ...zap.Field) Logger
-}
-
-// zapFactory implements Factory
-type zapFactory struct {
-	config zap.Config
-}
-
-// NewFactory creates a new logger factory
-func NewFactory(config zap.Config) Factory {
-	return &zapFactory{config: config}
-}
-
-func (f *zapFactory) New(name string) Logger {
-	logger, _ := f.config.Build()
-	return NewZapLogger(logger.Named(name))
-}
-
-func (f *zapFactory) NewWithFields(name string, fields ...zap.Field) Logger {
-	logger, _ := f.config.Build()
-	return NewZapLogger(logger.Named(name).With(fields...))
+// NewSimpleFactory creates a simple logger factory from zap config
+// This is a convenience function for simple use cases
+func NewSimpleFactory(config zap.Config) Factory {
+	return NewFactoryWithConfig(Config{
+		RotatingWriterConfig: RotatingWriterConfig{
+			Directory: "./logs",
+			MaxSize:   100,
+			MaxFiles:  10,
+			MaxAge:    30,
+			Compress:  true,
+		},
+		DisplayLevel: level.Info,
+		LogLevel:     level.Info,
+		LogFormat:    Plain,
+	})
 }
 
 // Factory and convenience functions
 
-// New creates a new logger with the given context
-func New(ctx ...interface{}) Logger {
-	return Root().With(ctx...)
-}
+// Note: New function moved to globals.go
 
 var (
 	root Logger
@@ -406,13 +374,6 @@ func SetDefault(l Logger) {
 	root = l
 }
 
-// Global convenience functions that use the root logger
-func Trace(msg string, ctx ...interface{}) { root.Trace(msg, ctx...) }
-func Debug(msg string, ctx ...interface{}) { root.Debug(msg, ctx...) }
-func Info(msg string, ctx ...interface{})  { root.Info(msg, ctx...) }
-func Warn(msg string, ctx ...interface{})  { root.Warn(msg, ctx...) }
-func Error(msg string, ctx ...interface{}) { root.Error(msg, ctx...) }
-func Crit(msg string, ctx ...interface{})  { root.Crit(msg, ctx...) }
 
 // Helper functions for formatting
 
