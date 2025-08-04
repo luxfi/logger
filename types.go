@@ -1,11 +1,5 @@
 package log
 
-// Field is a key/value pair for structured logging.
-type Field struct {
-	Key   string
-	Value any
-}
-
 // Level aliases for convenience.
 const (
 	// DebugLevel logs debug messages.

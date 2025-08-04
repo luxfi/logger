@@ -41,10 +41,10 @@ type Logger interface {
 	Handler() slog.Handler
 
 	// Additional methods for node compatibility
-	Fatal(msg string, fields ...zap.Field)
-	Verbo(msg string, fields ...zap.Field)
-	WithFields(fields ...zap.Field) Logger
-	WithOptions(opts ...zap.Option) Logger
+	Fatal(msg string, fields ...Field)
+	Verbo(msg string, fields ...Field)
+	WithFields(fields ...Field) Logger
+	WithOptions(opts ...Option) Logger
 	SetLevel(level slog.Level)
 	GetLevel() slog.Level
 	EnabledLevel(lvl slog.Level) bool
@@ -105,7 +105,7 @@ func (l *zapLogger) With(ctx ...interface{}) Logger {
 	}
 
 	// Convert ctx to zap fields
-	fields := make([]zap.Field, 0, len(ctx)/2)
+	fields := make([]Field, 0, len(ctx)/2)
 	for i := 0; i < len(ctx)-1; i += 2 {
 		key, ok := ctx[i].(string)
 		if !ok {
@@ -128,7 +128,7 @@ func (l *zapLogger) New(ctx ...interface{}) Logger {
 }
 
 // WithFields adds zap fields
-func (l *zapLogger) WithFields(fields ...zap.Field) Logger {
+func (l *zapLogger) WithFields(fields ...Field) Logger {
 	return &zapLogger{
 		logger:  l.logger.With(fields...),
 		sugar:   l.logger.With(fields...).Sugar(),
@@ -138,7 +138,7 @@ func (l *zapLogger) WithFields(fields ...zap.Field) Logger {
 }
 
 // WithOptions applies zap options
-func (l *zapLogger) WithOptions(opts ...zap.Option) Logger {
+func (l *zapLogger) WithOptions(opts ...Option) Logger {
 	return &zapLogger{
 		logger:  l.logger.WithOptions(opts...),
 		sugar:   l.logger.WithOptions(opts...).Sugar(),
@@ -212,12 +212,12 @@ func (l *zapLogger) Crit(msg string, ctx ...interface{}) {
 }
 
 // Fatal logs at fatal level
-func (l *zapLogger) Fatal(msg string, fields ...zap.Field) {
+func (l *zapLogger) Fatal(msg string, fields ...Field) {
 	l.logger.Fatal(msg, fields...)
 }
 
 // Verbo logs at very verbose level
-func (l *zapLogger) Verbo(msg string, fields ...zap.Field) {
+func (l *zapLogger) Verbo(msg string, fields ...Field) {
 	// Map verbo to trace/debug with a special field
 	l.logger.Debug(msg, append(fields, zap.String("level", "verbo"))...)
 }
@@ -266,8 +266,8 @@ func (l *zapLogger) Write(p []byte) (n int, err error) {
 // Helper functions
 
 // contextToFields converts variadic key-value pairs to zap fields
-func contextToFields(ctx []interface{}) []zap.Field {
-	fields := make([]zap.Field, 0, len(ctx)/2)
+func contextToFields(ctx []interface{}) []Field {
+	fields := make([]Field, 0, len(ctx)/2)
 	for i := 0; i < len(ctx)-1; i += 2 {
 		key, ok := ctx[i].(string)
 		if !ok {
@@ -323,6 +323,35 @@ func NewNoOpLogger() Logger {
 	nopCore := zapcore.NewNopCore()
 	return NewZapLogger(zap.New(nopCore))
 }
+
+// NoLog is a no-op logger for testing
+type NoLog struct{}
+
+// Implement all Logger interface methods as no-ops
+func (NoLog) With(ctx ...interface{}) Logger { return NoLog{} }
+func (NoLog) New(ctx ...interface{}) Logger { return NoLog{} }
+func (NoLog) Log(level slog.Level, msg string, ctx ...interface{}) {}
+func (NoLog) Trace(msg string, ctx ...interface{}) {}
+func (NoLog) Debug(msg string, ctx ...interface{}) {}
+func (NoLog) Info(msg string, ctx ...interface{}) {}
+func (NoLog) Warn(msg string, ctx ...interface{}) {}
+func (NoLog) Error(msg string, ctx ...interface{}) {}
+func (NoLog) Crit(msg string, ctx ...interface{}) {}
+func (NoLog) WriteLog(level slog.Level, msg string, attrs ...any) {}
+func (NoLog) Enabled(ctx context.Context, level slog.Level) bool { return false }
+func (NoLog) Handler() slog.Handler { return nil }
+func (NoLog) Fatal(msg string, fields ...Field) {}
+func (NoLog) Verbo(msg string, fields ...Field) {}
+func (NoLog) WithFields(fields ...Field) Logger { return NoLog{} }
+func (NoLog) WithOptions(opts ...Option) Logger { return NoLog{} }
+func (NoLog) SetLevel(level slog.Level) {}
+func (NoLog) GetLevel() slog.Level { return LevelInfo }
+func (NoLog) EnabledLevel(lvl slog.Level) bool { return false }
+func (NoLog) StopOnPanic() {}
+func (NoLog) RecoverAndPanic(f func()) { f() }
+func (NoLog) RecoverAndExit(f, exit func()) { f() }
+func (NoLog) Stop() {}
+func (NoLog) Write(p []byte) (n int, err error) { return len(p), nil }
 
 // NewSimpleFactory creates a simple logger factory from zap config
 // This is a convenience function for simple use cases
