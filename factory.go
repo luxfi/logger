@@ -352,7 +352,11 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	cores := []zapcore.Core{consoleCore, fileCore}
 	core := zapcore.NewTee(cores...)
 
-	zapLogger := zap.New(core)
+	// Add caller tracking and wrap with callerCore to show external call sites
+	zapLogger := zap.New(core, 
+		zap.AddCaller(),
+		zap.WrapCore(func(c zapcore.Core) zapcore.Core { return callerCore{Core: c} }),
+	)
 	if config.MsgPrefix != "" {
 		zapLogger = zapLogger.Named(config.MsgPrefix)
 	}
@@ -488,7 +492,12 @@ func NewLogger(prefix string, wrappedCores ...WrappedCore) Logger {
 		cores[i] = &wc
 	}
 	core := zapcore.NewTee(cores...)
-	zapLogger := zap.New(core)
+	
+	// Add caller tracking and wrap with callerCore to show external call sites
+	zapLogger := zap.New(core,
+		zap.AddCaller(),
+		zap.WrapCore(func(c zapcore.Core) zapcore.Core { return callerCore{Core: c} }),
+	)
 	if prefix != "" {
 		zapLogger = zapLogger.Named(prefix)
 	}
