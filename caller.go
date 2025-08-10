@@ -50,7 +50,9 @@ func (c callerCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.
 	if !c.Enabled(ent.Level) {
 		return ce
 	}
-	return c.Core.Check(ent, ce).AddCore(ent, c)
+	// Pass through to the wrapped core, but don't add ourselves again
+	// The actual caller will be set in Write method
+	return c.Core.Check(ent, ce)
 }
 
 func (c callerCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {

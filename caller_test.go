@@ -13,6 +13,7 @@ func TestCallerCore_UsesExternalFrame(t *testing.T) {
 	// Build an observed core at debug level and wrap it with callerCore.
 	obsCore, recorded := observer.New(zapcore.DebugLevel)
 	core := callerCore{Core: obsCore}
+	// Use zap.AddCaller() to enable caller tracking
 	logger := zap.New(core, zap.AddCaller())
 
 	// Log from THIS test file; the caller should be this file, not logger.go in this package.
