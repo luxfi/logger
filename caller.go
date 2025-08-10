@@ -18,6 +18,8 @@ func init() {
 		"github.com/luxfi/log",
 		"go.uber.org/zap",
 		"go.uber.org/zap/zapcore",
+		// Add common versioned patterns
+		"log@",  // Catch any versioned log module references
 	})
 }
 
@@ -47,12 +49,13 @@ func (c callerCore) With(fields []zapcore.Field) zapcore.Core {
 }
 
 func (c callerCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	// Check if the wrapped core wants to log this
 	if !c.Enabled(ent.Level) {
 		return ce
 	}
-	// Pass through to the wrapped core, but don't add ourselves again
-	// The actual caller will be set in Write method
-	return c.Core.Check(ent, ce)
+	// Create a new checked entry with just our wrapper
+	// This ensures we're the only core that processes the entry
+	return ce.AddCore(ent, c)
 }
 
 func (c callerCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
@@ -73,6 +76,7 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 	if n == 0 {
 		return zapcore.EntryCaller{}, false
 	}
+	
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		f, more := frames.Next()
@@ -94,8 +98,11 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 func isInternalFrame(f runtime.Frame) bool {
 	// f.Function is of the form: "github.com/org/pkg.(*type).method"
 	// f.File can include module versions: ".../github.com/org/pkg@v1.2.3/file.go"
+	// or just "log@v1.0.5/file.go" for imported modules
+	// or relative paths like "log/logger.go" when using local module replacements
 	pkgs := getInternalPkgs()
 	for _, p := range pkgs {
+		// Check function name first
 		if strings.HasPrefix(f.Function, p) {
 			return true
 		}
@@ -103,6 +110,32 @@ func isInternalFrame(f runtime.Frame) bool {
 		if strings.Contains(f.File, "/"+p+"@") || strings.Contains(f.File, "/"+p+"/") {
 			return true
 		}
+		// Check for shortened module path with version (e.g., "log@v1.0.5/logger.go")
+		if p == "log@" && strings.HasPrefix(f.File, p) {
+			return true
+		}
+		// Also check for versioned module paths like "log@v1.0.5"
+		// This handles cases where the module is loaded with a version tag
+		if idx := strings.LastIndex(p, "/"); idx >= 0 {
+			moduleName := p[idx+1:]
+			// Check if file contains the module name with version (e.g., "log@v1.0.5")
+			if strings.Contains(f.File, "/"+moduleName+"@") || strings.Contains(f.File, moduleName+"@") {
+				return true
+			}
+			// Also check for relative paths like "log/logger.go"
+			if strings.HasPrefix(f.File, moduleName+"/") {
+				return true
+			}
+		}
+	}
+	// Additionally check for "log@" pattern directly to catch versioned log module references
+	// This catches shortened paths like "log@v1.0.5/logger.go"
+	if strings.HasPrefix(f.File, "log@") {
+		return true
+	}
+	// Check for relative log path (when using local module replacement)
+	if strings.HasPrefix(f.File, "log/") {
+		return true
 	}
 	return false
 }

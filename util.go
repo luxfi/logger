@@ -15,7 +15,13 @@ func NewTestLogger(lvl Level) Logger {
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 
-	logger, _ := config.Build()
+	// Build the logger with caller information
+	logger, _ := config.Build(
+		zap.AddCaller(),
+		zap.WrapCore(func(c zapcore.Core) zapcore.Core { 
+			return callerCore{Core: c} 
+		}),
+	)
 	return NewZapLogger(logger)
 }
 
