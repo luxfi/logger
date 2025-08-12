@@ -18,8 +18,6 @@ func init() {
 		"github.com/luxfi/log",
 		"go.uber.org/zap",
 		"go.uber.org/zap/zapcore",
-		// Add common versioned patterns
-		"log@",  // Catch any versioned log module references
 	})
 }
 
@@ -80,7 +78,25 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		f, more := frames.Next()
+		// Skip internal frames (log module, zap, etc.)
 		if !isInternalFrame(f) {
+			// Also skip testing framework if we're in a test
+			if !strings.Contains(f.File, "/testing/") && !strings.Contains(f.File, "_test.go") {
+				return zapcore.EntryCaller{
+					Defined: true,
+					PC:      f.PC,
+					File:    f.File,
+					Line:    f.Line,
+				}, true
+			}
+			// In tests, if we hit testing framework, keep looking
+			if strings.Contains(f.File, "/testing/") {
+				if !more {
+					break
+				}
+				continue
+			}
+			// Found a test file, use it
 			return zapcore.EntryCaller{
 				Defined: true,
 				PC:      f.PC,
@@ -98,8 +114,15 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 func isInternalFrame(f runtime.Frame) bool {
 	// f.Function is of the form: "github.com/org/pkg.(*type).method"
 	// f.File can include module versions: ".../github.com/org/pkg@v1.2.3/file.go"
-	// or just "log@v1.0.5/file.go" for imported modules
-	// or relative paths like "log/logger.go" when using local module replacements
+	// or shortened forms like "log@v1.0.6/logger.go"
+	
+	// First check: is this frame from log@v*/ files?
+	// This catches the common case of "log@v1.0.6/logger.go:196"
+	if strings.Contains(f.File, "log@v") {
+		return true
+	}
+	
+	// Check against our internal package list
 	pkgs := getInternalPkgs()
 	for _, p := range pkgs {
 		// Check function name first
@@ -108,10 +131,6 @@ func isInternalFrame(f runtime.Frame) bool {
 		}
 		// Match either versioned or unversioned module paths on disk.
 		if strings.Contains(f.File, "/"+p+"@") || strings.Contains(f.File, "/"+p+"/") {
-			return true
-		}
-		// Check for shortened module path with version (e.g., "log@v1.0.5/logger.go")
-		if p == "log@" && strings.HasPrefix(f.File, p) {
 			return true
 		}
 		// Also check for versioned module paths like "log@v1.0.5"
@@ -128,12 +147,11 @@ func isInternalFrame(f runtime.Frame) bool {
 			}
 		}
 	}
-	// Additionally check for "log@" pattern directly to catch versioned log module references
-	// This catches shortened paths like "log@v1.0.5/logger.go"
-	if strings.HasPrefix(f.File, "log@") {
+	// Check for github.com/luxfi/log in any form (versioned or not)
+	if strings.Contains(f.File, "github.com/luxfi/log") {
 		return true
 	}
-	// Check for relative log path (when using local module replacement)
+	// Check for any log module files (catches relative paths)
 	if strings.HasPrefix(f.File, "log/") {
 		return true
 	}
