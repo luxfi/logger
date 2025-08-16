@@ -78,6 +78,15 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		f, more := frames.Next()
+		
+		// Skip runtime frames (Go 1.24+ compatibility)
+		if strings.Contains(f.File, "/runtime/") || strings.Contains(f.Function, "runtime.") {
+			if !more {
+				break
+			}
+			continue
+		}
+		
 		// Skip internal frames (log module, zap, etc.)
 		if !isInternalFrame(f) {
 			// Also skip testing framework if we're in a test
