@@ -353,7 +353,7 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	core := zapcore.NewTee(cores...)
 
 	// Add caller tracking and wrap with callerCore to show external call sites
-	zapLogger := zap.New(core, 
+	zapLogger := zap.New(core,
 		zap.AddCaller(),
 		zap.WrapCore(func(c zapcore.Core) zapcore.Core { return callerCore{Core: c} }),
 	)
@@ -492,7 +492,7 @@ func NewLogger(prefix string, wrappedCores ...WrappedCore) Logger {
 		cores[i] = &wc
 	}
 	core := zapcore.NewTee(cores...)
-	
+
 	// Add caller tracking and wrap with callerCore to show external call sites
 	zapLogger := zap.New(core,
 		zap.AddCaller(),

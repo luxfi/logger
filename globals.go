@@ -19,8 +19,8 @@ func init() {
 
 	logger, _ := config.Build(
 		zap.AddCaller(),
-		zap.WrapCore(func(c zapcore.Core) zapcore.Core { 
-			return callerCore{Core: c} 
+		zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+			return callerCore{Core: c}
 		}),
 	)
 	globalLogger = NewZapLogger(logger)

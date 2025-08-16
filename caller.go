@@ -74,11 +74,11 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 	if n == 0 {
 		return zapcore.EntryCaller{}, false
 	}
-	
+
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		f, more := frames.Next()
-		
+
 		// Skip runtime frames (Go 1.24+ compatibility)
 		if strings.Contains(f.File, "/runtime/") || strings.Contains(f.Function, "runtime.") {
 			if !more {
@@ -86,7 +86,7 @@ func firstExternalCaller() (zapcore.EntryCaller, bool) {
 			}
 			continue
 		}
-		
+
 		// Skip internal frames (log module, zap, etc.)
 		if !isInternalFrame(f) {
 			// Also skip testing framework if we're in a test
@@ -124,13 +124,13 @@ func isInternalFrame(f runtime.Frame) bool {
 	// f.Function is of the form: "github.com/org/pkg.(*type).method"
 	// f.File can include module versions: ".../github.com/org/pkg@v1.2.3/file.go"
 	// or shortened forms like "log@v1.0.6/logger.go"
-	
+
 	// First check: is this frame from log@v*/ files?
 	// This catches the common case of "log@v1.0.6/logger.go:196"
 	if strings.Contains(f.File, "log@v") {
 		return true
 	}
-	
+
 	// Check against our internal package list
 	pkgs := getInternalPkgs()
 	for _, p := range pkgs {

@@ -328,30 +328,30 @@ func NewNoOpLogger() Logger {
 type NoLog struct{}
 
 // Implement all Logger interface methods as no-ops
-func (NoLog) With(ctx ...interface{}) Logger { return NoLog{} }
-func (NoLog) New(ctx ...interface{}) Logger { return NoLog{} }
+func (NoLog) With(ctx ...interface{}) Logger                       { return NoLog{} }
+func (NoLog) New(ctx ...interface{}) Logger                        { return NoLog{} }
 func (NoLog) Log(level slog.Level, msg string, ctx ...interface{}) {}
-func (NoLog) Trace(msg string, ctx ...interface{}) {}
-func (NoLog) Debug(msg string, ctx ...interface{}) {}
-func (NoLog) Info(msg string, ctx ...interface{}) {}
-func (NoLog) Warn(msg string, ctx ...interface{}) {}
-func (NoLog) Error(msg string, ctx ...interface{}) {}
-func (NoLog) Crit(msg string, ctx ...interface{}) {}
-func (NoLog) WriteLog(level slog.Level, msg string, attrs ...any) {}
-func (NoLog) Enabled(ctx context.Context, level slog.Level) bool { return false }
-func (NoLog) Handler() slog.Handler { return nil }
-func (NoLog) Fatal(msg string, fields ...Field) {}
-func (NoLog) Verbo(msg string, fields ...Field) {}
-func (NoLog) WithFields(fields ...Field) Logger { return NoLog{} }
-func (NoLog) WithOptions(opts ...Option) Logger { return NoLog{} }
-func (NoLog) SetLevel(level slog.Level) {}
-func (NoLog) GetLevel() slog.Level { return LevelInfo }
-func (NoLog) EnabledLevel(lvl slog.Level) bool { return false }
-func (NoLog) StopOnPanic() {}
-func (NoLog) RecoverAndPanic(f func()) { f() }
-func (NoLog) RecoverAndExit(f, exit func()) { f() }
-func (NoLog) Stop() {}
-func (NoLog) Write(p []byte) (n int, err error) { return len(p), nil }
+func (NoLog) Trace(msg string, ctx ...interface{})                 {}
+func (NoLog) Debug(msg string, ctx ...interface{})                 {}
+func (NoLog) Info(msg string, ctx ...interface{})                  {}
+func (NoLog) Warn(msg string, ctx ...interface{})                  {}
+func (NoLog) Error(msg string, ctx ...interface{})                 {}
+func (NoLog) Crit(msg string, ctx ...interface{})                  {}
+func (NoLog) WriteLog(level slog.Level, msg string, attrs ...any)  {}
+func (NoLog) Enabled(ctx context.Context, level slog.Level) bool   { return false }
+func (NoLog) Handler() slog.Handler                                { return nil }
+func (NoLog) Fatal(msg string, fields ...Field)                    {}
+func (NoLog) Verbo(msg string, fields ...Field)                    {}
+func (NoLog) WithFields(fields ...Field) Logger                    { return NoLog{} }
+func (NoLog) WithOptions(opts ...Option) Logger                    { return NoLog{} }
+func (NoLog) SetLevel(level slog.Level)                            {}
+func (NoLog) GetLevel() slog.Level                                 { return LevelInfo }
+func (NoLog) EnabledLevel(lvl slog.Level) bool                     { return false }
+func (NoLog) StopOnPanic()                                         {}
+func (NoLog) RecoverAndPanic(f func())                             { f() }
+func (NoLog) RecoverAndExit(f, exit func())                        { f() }
+func (NoLog) Stop()                                                {}
+func (NoLog) Write(p []byte) (n int, err error)                    { return len(p), nil }
 
 // NewSimpleFactory creates a simple logger factory from zap config
 // This is a convenience function for simple use cases
@@ -388,8 +388,8 @@ func init() {
 
 	logger, _ := config.Build(
 		zap.AddCaller(),
-		zap.WrapCore(func(c zapcore.Core) zapcore.Core { 
-			return callerCore{Core: c} 
+		zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+			return callerCore{Core: c}
 		}),
 	)
 	root = NewZapLogger(logger)

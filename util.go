@@ -1,9 +1,9 @@
 package log
 
 import (
+	"github.com/luxfi/log/level"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"github.com/luxfi/log/level"
 )
 
 // NewTestLogger creates a logger suitable for testing
@@ -18,8 +18,8 @@ func NewTestLogger(lvl Level) Logger {
 	// Build the logger with caller information
 	logger, _ := config.Build(
 		zap.AddCaller(),
-		zap.WrapCore(func(c zapcore.Core) zapcore.Core { 
-			return callerCore{Core: c} 
+		zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+			return callerCore{Core: c}
 		}),
 	)
 	return NewZapLogger(logger)

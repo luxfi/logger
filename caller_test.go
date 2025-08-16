@@ -28,12 +28,12 @@ func TestCallerCore_UsesExternalFrame(t *testing.T) {
 		t.Fatalf("expected caller to be defined")
 	}
 	file := ent.Caller.File
-	
+
 	// Verify that runtime frames are properly skipped (Go 1.24+ compatibility)
 	if strings.Contains(file, "runtime/asm_") || strings.Contains(file, "/runtime/") {
 		t.Fatalf("callerCore failed to skip runtime frames; got %s", file)
 	}
-	
+
 	if !strings.HasSuffix(file, "caller_test.go") {
 		t.Fatalf("expected caller file to be caller_test.go; got %s", file)
 	}
@@ -65,16 +65,16 @@ func TestCallerCore_MultipleLogLevels(t *testing.T) {
 			t.Errorf("entry %d: expected caller to be defined", i)
 			continue
 		}
-		
+
 		file := ent.Caller.File
 		if strings.Contains(file, "runtime/asm_") || strings.Contains(file, "/runtime/") {
 			t.Errorf("entry %d: runtime frames not skipped; got %s", i, file)
 		}
-		
+
 		if !strings.HasSuffix(file, "caller_test.go") {
 			t.Errorf("entry %d: expected caller_test.go; got %s", i, file)
 		}
-		
+
 		// Verify line numbers are different for each log call
 		expectedLine := 52 + i // Starting line of logger.Debug call
 		if ent.Caller.Line != expectedLine {
@@ -116,7 +116,7 @@ func TestCallerCore_NestedFunction(t *testing.T) {
 	if !strings.HasSuffix(file, "caller_test.go") {
 		t.Fatalf("expected caller_test.go; got %s", file)
 	}
-	
+
 	// Should point to the line in logHelper where logger.Info is called
 	if ent.Caller.Line != 94 {
 		t.Errorf("expected line 94 (logHelper function), got %d", ent.Caller.Line)
@@ -159,11 +159,11 @@ func TestCallerCore_WithFields(t *testing.T) {
 
 func TestCallerCore_RegisterInternalPackages(t *testing.T) {
 	// Test that RegisterInternalPackages works correctly
-	
+
 	// First, add a test package to internal packages
 	testPkg := "github.com/test/wrapper"
 	RegisterInternalPackages(testPkg)
-	
+
 	// Verify it was added
 	pkgs := getInternalPkgs()
 	found := false
@@ -176,11 +176,11 @@ func TestCallerCore_RegisterInternalPackages(t *testing.T) {
 	if !found {
 		t.Fatalf("failed to register internal package %s", testPkg)
 	}
-	
+
 	// Test that multiple packages can be registered at once
 	RegisterInternalPackages("pkg1", "pkg2", "pkg3")
 	pkgs = getInternalPkgs()
-	
+
 	expectedPkgs := []string{"pkg1", "pkg2", "pkg3"}
 	for _, expected := range expectedPkgs {
 		found := false
@@ -221,7 +221,7 @@ func TestCallerCore_RuntimeFrameSkipping(t *testing.T) {
 	}
 
 	file := ent.Caller.File
-	
+
 	// Should never contain runtime paths
 	if strings.Contains(file, "/runtime/") {
 		t.Fatalf("runtime frame not properly skipped: %s", file)
@@ -229,7 +229,7 @@ func TestCallerCore_RuntimeFrameSkipping(t *testing.T) {
 	if strings.Contains(file, "runtime/asm_") {
 		t.Fatalf("runtime assembly frame not properly skipped: %s", file)
 	}
-	
+
 	// Should be from this test file
 	if !strings.HasSuffix(file, "caller_test.go") {
 		t.Fatalf("expected caller_test.go; got %s", file)
