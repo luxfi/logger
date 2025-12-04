@@ -10,17 +10,26 @@ import (
 )
 
 // Level represents a logging level
+// Values are aligned with zapcore.Level for direct casting
 type Level int8
 
 const (
-	Verbo Level = iota - 9
-	Debug
-	Trace
-	Info
-	Warn
-	Error
-	Fatal
-	Off
+	// Verbo is the most verbose level, below debug
+	Verbo Level = -2
+	// Debug level (matches zapcore.DebugLevel = -1)
+	Debug Level = -1
+	// Trace level (same as debug since zap doesn't have trace)
+	Trace Level = -1
+	// Info level (matches zapcore.InfoLevel = 0)
+	Info Level = 0
+	// Warn level (matches zapcore.WarnLevel = 1)
+	Warn Level = 1
+	// Error level (matches zapcore.ErrorLevel = 2)
+	Error Level = 2
+	// Fatal level (matches zapcore.FatalLevel = 5)
+	Fatal Level = 5
+	// Off disables logging
+	Off Level = 6
 )
 
 var ErrUnknownLevel = errors.New("unknown log level")
@@ -38,9 +47,7 @@ func (l Level) String() string {
 		return "WARN"
 	case Info:
 		return "INFO"
-	case Trace:
-		return "TRACE"
-	case Debug:
+	case Debug: // Debug and Trace are both -1, mapped to DEBUG
 		return "DEBUG"
 	case Verbo:
 		return "VERBO"
