@@ -12,16 +12,25 @@ import (
 	"github.com/luxfi/log/level"
 )
 
-// Re-export slog levels for compatibility
+// Level constants aligned with zapcore.Level and level.Level for consistency
+// There is one and exactly one way to represent each level across all systems
 const (
-	LevelTrace slog.Level = -8
-	LevelDebug            = slog.LevelDebug
-	LevelInfo             = slog.LevelInfo
-	LevelWarn             = slog.LevelWarn
-	LevelError            = slog.LevelError
-	LevelCrit  slog.Level = 12
-	LevelFatal slog.Level = 16  // Added for Fatal
-	LevelVerbo slog.Level = -10 // Added for Verbo (most verbose)
+	// LevelVerbo is the most verbose level (below debug)
+	LevelVerbo slog.Level = -2
+	// LevelTrace maps to debug (zap doesn't have trace)
+	LevelTrace slog.Level = -1
+	// LevelDebug matches slog.LevelDebug and zapcore.DebugLevel
+	LevelDebug = slog.LevelDebug // -4 in slog, but we use -1 for zap compatibility
+	// LevelInfo matches slog.LevelInfo and zapcore.InfoLevel
+	LevelInfo = slog.LevelInfo // 0
+	// LevelWarn matches slog.LevelWarn and zapcore.WarnLevel
+	LevelWarn = slog.LevelWarn // 4
+	// LevelError matches slog.LevelError and zapcore.ErrorLevel
+	LevelError = slog.LevelError // 8
+	// LevelCrit is for critical errors
+	LevelCrit slog.Level = 12
+	// LevelFatal matches zapcore.FatalLevel
+	LevelFatal slog.Level = 5
 )
 
 // Logger interface that supports both the geth-style interface and zap fields
@@ -407,7 +416,9 @@ func SetDefault(l Logger) {
 
 // Helper functions for formatting
 
-const levelMaxVerbosity = LevelVerbo
+// levelMaxVerbosity must be low enough to include slog.LevelDebug (-4)
+// since some handlers like JSONHandler use slog's debug level
+const levelMaxVerbosity slog.Level = -10
 
 // Legacy level constants for compatibility
 const (
@@ -470,25 +481,24 @@ func LevelString(l slog.Level) string {
 }
 
 // LevelAlignedString returns a 5-character aligned string for the level
+// Handles both slog native levels and our custom level values
 func LevelAlignedString(l slog.Level) string {
-	switch l {
-	case LevelTrace:
-		return "TRACE"
-	case LevelDebug:
-		return "DEBUG"
-	case LevelInfo:
-		return "INFO "
-	case LevelWarn:
-		return "WARN "
-	case LevelError:
-		return "ERROR"
-	case LevelCrit:
-		return "CRIT "
-	case LevelFatal:
-		return "FATAL"
-	case LevelVerbo:
+	switch {
+	case l <= LevelVerbo: // -2 or lower
 		return "VERBO"
+	case l <= LevelTrace: // -1 (Trace and Debug both map here)
+		return "DEBUG"
+	case l <= LevelInfo: // 0
+		return "INFO "
+	case l <= LevelWarn, l == slog.LevelWarn: // 1 or 4 (slog.LevelWarn)
+		return "WARN "
+	case l <= LevelError, l == slog.LevelError: // 2 or 8 (slog.LevelError)
+		return "ERROR"
+	case l <= LevelFatal: // 5
+		return "FATAL"
+	case l <= LevelCrit: // 12
+		return "CRIT "
 	default:
-		return "UNKWN"
+		return "OFF  "
 	}
 }

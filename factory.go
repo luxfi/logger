@@ -91,8 +91,7 @@ var (
 		level.Error: Orange,
 		level.Warn:  Yellow,
 		level.Info:  Reset,
-		level.Trace: LightPurple,
-		level.Debug: LightBlue,
+		level.Debug: LightBlue, // Debug and Trace are both -1, use one entry
 		level.Verbo: LightGreen,
 	}
 
