@@ -1,8 +1,6 @@
 module github.com/luxfi/log
 
-go 1.25
-
-toolchain go1.24.6
+go 1.25.5
 
 require (
 	github.com/holiman/uint256 v1.3.2
