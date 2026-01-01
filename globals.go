@@ -5,6 +5,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// Note: zap import retained for init() which uses zapcore types
+
 // Global logger instance used by the package-level functions
 var globalLogger Logger
 
@@ -73,78 +75,3 @@ func New(ctx ...interface{}) Logger {
 	return globalLogger.With(ctx...)
 }
 
-// Legacy V-level logging functions for geth compatibility
-
-// Trace0 logs a message at trace level
-func Trace0(msg string) {
-	globalLogger.Trace(msg)
-}
-
-// Debug0 logs a message at debug level
-func Debug0(msg string) {
-	globalLogger.Debug(msg)
-}
-
-// Info0 logs a message at info level
-func Info0(msg string) {
-	globalLogger.Info(msg)
-}
-
-// Warn0 logs a message at warn level
-func Warn0(msg string) {
-	globalLogger.Warn(msg)
-}
-
-// Error0 logs a message at error level
-func Error0(msg string) {
-	globalLogger.Error(msg)
-}
-
-// Crit0 logs a message at critical level
-func Crit0(msg string) {
-	globalLogger.Crit(msg)
-}
-
-// Additional functions for zap field compatibility
-
-// TraceF logs a message at trace level with zap fields
-func TraceF(msg string, fields ...zap.Field) {
-	if zl, ok := globalLogger.(*zapLogger); ok {
-		zl.logger.Debug(msg, fields...) // Map trace to debug in zap
-	}
-}
-
-// DebugF logs a message at debug level with zap fields
-func DebugF(msg string, fields ...zap.Field) {
-	if zl, ok := globalLogger.(*zapLogger); ok {
-		zl.logger.Debug(msg, fields...)
-	}
-}
-
-// InfoF logs a message at info level with zap fields
-func InfoF(msg string, fields ...zap.Field) {
-	if zl, ok := globalLogger.(*zapLogger); ok {
-		zl.logger.Info(msg, fields...)
-	}
-}
-
-// WarnF logs a message at warn level with zap fields
-func WarnF(msg string, fields ...zap.Field) {
-	if zl, ok := globalLogger.(*zapLogger); ok {
-		zl.logger.Warn(msg, fields...)
-	}
-}
-
-// ErrorF logs a message at error level with zap fields
-func ErrorF(msg string, fields ...zap.Field) {
-	if zl, ok := globalLogger.(*zapLogger); ok {
-		zl.logger.Error(msg, fields...)
-	}
-}
-
-// CritF logs a message at critical level with zap fields
-func CritF(msg string, fields ...zap.Field) {
-	if zl, ok := globalLogger.(*zapLogger); ok {
-		zl.logger.Fatal(msg, fields...)
-	}
-}

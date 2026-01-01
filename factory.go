@@ -11,7 +11,6 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/exp/maps"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/luxfi/log/level"
@@ -438,7 +437,11 @@ func (f *factory) GetLoggerNames() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
-	return maps.Keys(f.loggers)
+	names := make([]string, 0, len(f.loggers))
+	for name := range f.loggers {
+		names = append(names, name)
+	}
+	return names
 }
 
 func (f *factory) Close() {

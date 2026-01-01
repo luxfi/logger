@@ -383,35 +383,16 @@ func NewSimpleFactory(config zap.Config) Factory {
 
 // Note: New function moved to globals.go
 
-var (
-	root Logger
-)
-
-func init() {
-	// Initialize with a default zap logger
-	config := zap.NewProductionConfig()
-	config.DisableStacktrace = true
-	config.Encoding = "console"
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	config.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-
-	logger, _ := config.Build(
-		zap.AddCaller(),
-		zap.WrapCore(func(c zapcore.Core) zapcore.Core {
-			return callerCore{Core: c}
-		}),
-	)
-	root = NewZapLogger(logger)
-}
-
-// Root returns the root logger
+// Root returns the global logger
+// This is an alias for the globalLogger defined in globals.go
 func Root() Logger {
-	return root
+	return globalLogger
 }
 
 // SetDefault sets the default root logger
+// This is an alias for SetGlobalLogger defined in globals.go
 func SetDefault(l Logger) {
-	root = l
+	SetGlobalLogger(l)
 }
 
 // Helper functions for formatting
