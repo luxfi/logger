@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/holiman/uint256 v1.3.2
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
