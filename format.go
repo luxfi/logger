@@ -32,21 +32,22 @@ type TerminalStringer interface {
 
 func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byte {
 	msg := escapeMessage(r.Message)
-	var color = ""
+	var levelColor = ""
+	var timestampColor = "\x1b[30;1m" // Dark gray/bold for timestamp
 	if usecolor {
 		switch r.Level {
 		case LevelCrit:
-			color = "\x1b[35m"
+			levelColor = "\x1b[35m" // Magenta
 		case slog.LevelError:
-			color = "\x1b[31m"
+			levelColor = "\x1b[31m" // Red
 		case slog.LevelWarn:
-			color = "\x1b[33m"
+			levelColor = "\x1b[33m" // Yellow
 		case slog.LevelInfo:
-			color = "\x1b[32m"
+			levelColor = "\x1b[32m" // Green
 		case slog.LevelDebug:
-			color = "\x1b[36m"
+			levelColor = "\x1b[36m" // Cyan
 		case LevelTrace:
-			color = "\x1b[34m"
+			levelColor = "\x1b[34m" // Blue
 		}
 	}
 	if buf == nil {
@@ -54,16 +55,25 @@ func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byt
 	}
 	b := bytes.NewBuffer(buf)
 
-	if color != "" { // Start color
-		b.WriteString(color)
+	// Write timestamp in dark gray
+	if timestampColor != "" {
+		b.WriteString(timestampColor)
+	}
+	writeTimeTermFormat(b, r.Time)
+	if timestampColor != "" {
+		b.WriteString("\x1b[0m") // Reset color
+	}
+	b.WriteString(" ")
+
+	// Write level in color (lowercase will be handled by LevelAlignedString)
+	if levelColor != "" {
+		b.WriteString(levelColor)
 		b.WriteString(LevelAlignedString(r.Level))
 		b.WriteString("\x1b[0m")
 	} else {
 		b.WriteString(LevelAlignedString(r.Level))
 	}
-	b.WriteString("[")
-	writeTimeTermFormat(b, r.Time)
-	b.WriteString("] ")
+	b.WriteString(" ")
 	b.WriteString(msg)
 
 	// try to justify the log output for short messages
@@ -73,7 +83,7 @@ func (h *TerminalHandler) format(buf []byte, r slog.Record, usecolor bool) []byt
 		b.Write(spaces[:termMsgJust-length])
 	}
 	// print the attributes
-	h.formatAttributes(b, r, color)
+	h.formatAttributes(b, r, levelColor)
 
 	return b.Bytes()
 }
@@ -326,22 +336,14 @@ func escapeMessage(s string) string {
 	return strconv.Quote(s)
 }
 
-// writeTimeTermFormat writes on the format "01-02|15:04:05.000"
+// writeTimeTermFormat writes on the format "15:04:05" (HH:MM:SS only)
 func writeTimeTermFormat(buf *bytes.Buffer, t time.Time) {
-	_, month, day := t.Date()
-	writePosIntWidth(buf, int(month), 2)
-	buf.WriteByte('-')
-	writePosIntWidth(buf, day, 2)
-	buf.WriteByte('|')
 	hour, min, sec := t.Clock()
 	writePosIntWidth(buf, hour, 2)
 	buf.WriteByte(':')
 	writePosIntWidth(buf, min, 2)
 	buf.WriteByte(':')
 	writePosIntWidth(buf, sec, 2)
-	ns := t.Nanosecond()
-	buf.WriteByte('.')
-	writePosIntWidth(buf, ns/1e6, 3)
 }
 
 // writePosIntWidth writes non-negative integer i to the buffer, padded on the left

@@ -466,17 +466,17 @@ func LevelString(l slog.Level) string {
 func LevelAlignedString(l slog.Level) string {
 	switch {
 	case l <= LevelVerbo: // -2 or lower
-		return "VERBO"
+		return "verbo"
 	case l <= LevelTrace: // -1 (Trace and Debug both map here)
-		return "DEBUG"
+		return "debug"
 	case l <= LevelInfo: // 0
-		return "INFO "
+		return "info "
 	case l <= LevelWarn, l == slog.LevelWarn: // 1 or 4 (slog.LevelWarn)
-		return "WARN "
+		return "warn "
 	case l <= LevelError, l == slog.LevelError: // 2 or 8 (slog.LevelError)
-		return "ERROR"
+		return "error"
 	case l <= LevelFatal: // 5
-		return "FATAL"
+		return "fatal"
 	case l <= LevelCrit: // 12
 		return "CRIT "
 	default:
