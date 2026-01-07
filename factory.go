@@ -188,7 +188,7 @@ func NewFactoryWithConfig(config Config) Factory {
 	}
 }
 
-const termTimeFormat = "[01-02|15:04:05.000]"
+const termTimeFormat = "15:04:05"
 
 var (
 	defaultEncoderConfig = zapcore.EncoderConfig{
@@ -202,8 +202,9 @@ var (
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 	jsonEncoderConfig zapcore.EncoderConfig
-	termTimeEncoder   = zapcore.TimeEncoderOfLayout(termTimeFormat)
 )
+
+var termTimeEncoder = zapcore.TimeEncoderOfLayout(termTimeFormat)
 
 func init() {
 	jsonEncoderConfig = defaultEncoderConfig
@@ -213,6 +214,7 @@ func init() {
 	for level, color := range levelToColor {
 		levelToCapitalColorString[level] = color.Wrap(level.LowerString())
 	}
+	termTimeEncoder = zapcore.TimeEncoderOfLayout(termTimeFormat)
 }
 
 func levelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
