@@ -45,6 +45,7 @@ type Config struct {
 	LogFormat               Format `json:"logFormat"`
 	MsgPrefix               string `json:"-"`
 	LoggerName              string `json:"-"`
+	ConsoleWriter           io.Writer `json:"-"`
 }
 
 // Format specifies the log format
@@ -114,6 +115,9 @@ func (f Format) MarshalJSON() ([]byte, error) {
 
 // ToFormat converts a string to Format
 func ToFormat(h string, fd uintptr) (Format, error) {
+	if os.Getenv("NO_COLOR") != "" {
+		return Plain, nil
+	}
 	switch strings.ToLower(h) {
 	case "auto":
 		// Note: We're not checking if it's a terminal for now
@@ -207,12 +211,12 @@ func init() {
 	jsonEncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	jsonEncoderConfig.EncodeDuration = zapcore.NanosDurationEncoder
 	for level, color := range levelToColor {
-		levelToCapitalColorString[level] = color.Wrap(level.String())
+		levelToCapitalColorString[level] = color.Wrap(level.LowerString())
 	}
 }
 
 func levelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-	enc.AppendString(Level(l).String())
+	enc.AppendString(Level(l).LowerString())
 }
 
 func jsonLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
@@ -222,7 +226,7 @@ func jsonLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 func ConsoleColorLevelEncoder(l zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
 	s, ok := levelToCapitalColorString[Level(l)]
 	if !ok {
-		s = unknownLevelColor.Wrap(l.String())
+		s = unknownLevelColor.Wrap(Level(l).LowerString())
 	}
 	enc.AppendString(s)
 }
@@ -334,7 +338,11 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	consoleEnc := config.LogFormat.ConsoleEncoder()
 	fileEnc := config.LogFormat.FileEncoder()
 
-	consoleCore := NewWrappedCore(config.DisplayLevel, zapcore.AddSync(os.Stdout), consoleEnc)
+	consoleWriter := config.ConsoleWriter
+	if consoleWriter == nil {
+		consoleWriter = os.Stdout
+	}
+	consoleCore := NewWrappedCore(config.DisplayLevel, zapcore.AddSync(consoleWriter), consoleEnc)
 	consoleCore.WriterDisabled = config.DisableWriterDisplaying
 
 	rw := &lumberjack.Logger{
