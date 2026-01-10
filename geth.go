@@ -63,98 +63,127 @@ func Root() Logger {
 	return defaultLogger
 }
 
-// applyFields applies geth-style Fields to an Event
-func applyFields(e *Event, fields []Field) *Event {
+// applyContext applies geth-style key-value pairs to an Event.
+// Accepts alternating key-value pairs: key1, val1, key2, val2, ...
+func applyContext(e *Event, ctx []any) *Event {
 	if e == nil {
 		return nil
 	}
-	for _, f := range fields {
-		switch v := f.Value.(type) {
+	for i := 0; i+1 < len(ctx); i += 2 {
+		key, ok := ctx[i].(string)
+		if !ok {
+			continue
+		}
+		val := ctx[i+1]
+		switch v := val.(type) {
 		case string:
-			e = e.Str(f.Key, v)
+			e = e.Str(key, v)
 		case int:
-			e = e.Int(f.Key, v)
+			e = e.Int(key, v)
 		case int8:
-			e = e.Int8(f.Key, v)
+			e = e.Int8(key, v)
 		case int16:
-			e = e.Int16(f.Key, v)
+			e = e.Int16(key, v)
 		case int32:
-			e = e.Int32(f.Key, v)
+			e = e.Int32(key, v)
 		case int64:
-			e = e.Int64(f.Key, v)
+			e = e.Int64(key, v)
 		case uint:
-			e = e.Uint(f.Key, v)
+			e = e.Uint(key, v)
 		case uint8:
-			e = e.Uint8(f.Key, v)
+			e = e.Uint8(key, v)
 		case uint16:
-			e = e.Uint16(f.Key, v)
+			e = e.Uint16(key, v)
 		case uint32:
-			e = e.Uint32(f.Key, v)
+			e = e.Uint32(key, v)
 		case uint64:
-			e = e.Uint64(f.Key, v)
+			e = e.Uint64(key, v)
 		case float32:
-			e = e.Float32(f.Key, v)
+			e = e.Float32(key, v)
 		case float64:
-			e = e.Float64(f.Key, v)
+			e = e.Float64(key, v)
 		case bool:
-			e = e.Bool(f.Key, v)
+			e = e.Bool(key, v)
 		case time.Duration:
-			e = e.Dur(f.Key, v)
+			e = e.Dur(key, v)
 		case time.Time:
-			e = e.Time(f.Key, v)
+			e = e.Time(key, v)
 		case error:
-			e = e.AnErr(f.Key, v)
+			if v != nil {
+				e = e.AnErr(key, v)
+			}
 		case []byte:
-			e = e.Bytes(f.Key, v)
+			e = e.Bytes(key, v)
 		case fmt.Stringer:
 			if v != nil {
-				e = e.Str(f.Key, v.String())
+				e = e.Str(key, v.String())
+			}
+		case Field:
+			// Support Field type for backward compatibility
+			switch fv := v.Value.(type) {
+			case string:
+				e = e.Str(v.Key, fv)
+			case error:
+				e = e.AnErr(v.Key, fv)
+			default:
+				e = e.Interface(v.Key, v.Value)
 			}
 		default:
-			e = e.Interface(f.Key, v)
+			e = e.Interface(key, v)
 		}
 	}
 	return e
 }
 
 // Geth-style global logging functions
+// These accept alternating key-value pairs: msg, key1, val1, key2, val2, ...
 
-// Trace logs at trace level with geth-style fields
-func Trace(msg string, fields ...Field) {
-	applyFields(defaultLogger.Trace(), fields).Msg(msg)
+// Trace logs at trace level with geth-style context
+func Trace(msg string, ctx ...any) {
+	applyContext(defaultLogger.Trace(), ctx).Msg(msg)
 }
 
-// Debug logs at debug level with geth-style fields
-func Debug(msg string, fields ...Field) {
-	applyFields(defaultLogger.Debug(), fields).Msg(msg)
+// Debug logs at debug level with geth-style context
+func Debug(msg string, ctx ...any) {
+	applyContext(defaultLogger.Debug(), ctx).Msg(msg)
 }
 
-// Info logs at info level with geth-style fields
-func Info(msg string, fields ...Field) {
-	applyFields(defaultLogger.Info(), fields).Msg(msg)
+// Info logs at info level with geth-style context
+func Info(msg string, ctx ...any) {
+	applyContext(defaultLogger.Info(), ctx).Msg(msg)
 }
 
-// Warn logs at warn level with geth-style fields
-func Warn(msg string, fields ...Field) {
-	applyFields(defaultLogger.Warn(), fields).Msg(msg)
+// Warn logs at warn level with geth-style context
+func Warn(msg string, ctx ...any) {
+	applyContext(defaultLogger.Warn(), ctx).Msg(msg)
 }
 
-// Error logs at error level with geth-style fields
-func Error(msg string, fields ...Field) {
-	applyFields(defaultLogger.Error(), fields).Msg(msg)
+// Error logs at error level with geth-style context
+func Error(msg string, ctx ...any) {
+	applyContext(defaultLogger.Error(), ctx).Msg(msg)
 }
 
-// Fatal logs at fatal level with geth-style fields and exits
-func Fatal(msg string, fields ...Field) {
-	applyFields(defaultLogger.Fatal(), fields).Msg(msg)
+// Fatal logs at fatal level with geth-style context and exits
+func Fatal(msg string, ctx ...any) {
+	applyContext(defaultLogger.Fatal(), ctx).Msg(msg)
 }
 
 // Crit is an alias for Fatal (geth compatibility)
-func Crit(msg string, fields ...Field) {
-	Fatal(msg, fields...)
+func Crit(msg string, ctx ...any) {
+	Fatal(msg, ctx...)
 }
 
-// Log logs at the specified level with geth-style fields
-func Log(level Level, msg string, fields ...Field) {
-	applyFields(defaultLogger.WithLevel(level), fields).Msg(msg)
+// Log logs at the specified level with geth-style context
+func Log(level Level, msg string, ctx ...any) {
+	applyContext(defaultLogger.WithLevel(level), ctx).Msg(msg)
+}
+
+// NewNoOpLogger returns a disabled logger.
+func NewNoOpLogger() Logger {
+	return Nop()
+}
+
+// NewTestLogger returns a logger suitable for testing.
+func NewTestLogger() Logger {
+	return New(os.Stderr).With().Timestamp().Logger()
 }
