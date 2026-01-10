@@ -1,116 +1,20 @@
-// Package logger provides a lightweight logging library dedicated to JSON logging.
+// Package logger provides a high-performance structured logging library.
 //
-// A global Logger can be use for simple logging:
+// This package supports two logging styles:
 //
-//     import "github.com/luxfi/logger/log"
+// 1. Geth-style variadic logging (recommended for compatibility):
 //
-//     log.Info().Msg("hello world")
-//     // Output: {"time":1494567715,"level":"info","message":"hello world"}
+//	log := logger.New("component", "myapp")
+//	log.Info("server started", "port", 8080)
+//	log.Debug("processing request", "id", reqID, "user", userID)
 //
-// NOTE: To import the global logger, import the "log" subpackage "github.com/luxfi/logger/log".
+// 2. Method chaining (zero-allocation):
 //
-// Fields can be added to log messages:
+//	log := logger.NewWriter(os.Stderr).With().Str("component", "myapp").Logger()
+//	log.Info().Str("port", "8080").Msg("server started")
 //
-//     log.Info().Str("foo", "bar").Msg("hello world")
-//     // Output: {"time":1494567715,"level":"info","message":"hello world","foo":"bar"}
-//
-// Create logger instance to manage different outputs:
-//
-//     logger := logger.New(os.Stderr).With().Timestamp().Logger()
-//     logger.Info().
-//            Str("foo", "bar").
-//            Msg("hello world")
-//     // Output: {"time":1494567715,"level":"info","message":"hello world","foo":"bar"}
-//
-// Sub-loggers let you chain loggers with additional context:
-//
-//     sublogger := log.With().Str("component", "foo").Logger()
-//     sublogger.Info().Msg("hello world")
-//     // Output: {"time":1494567715,"level":"info","message":"hello world","component":"foo"}
-//
-// Level logging
-//
-//     logger.SetGlobalLevel(logger.InfoLevel)
-//
-//     log.Debug().Msg("filtered out message")
-//     log.Info().Msg("routed message")
-//
-//     if e := log.Debug(); e.Enabled() {
-//         // Compute log output only if enabled.
-//         value := compute()
-//         e.Str("foo": value).Msg("some debug message")
-//     }
-//     // Output: {"level":"info","time":1494567715,"routed message"}
-//
-// Customize automatic field names:
-//
-//     log.TimestampFieldName = "t"
-//     log.LevelFieldName = "p"
-//     log.MessageFieldName = "m"
-//
-//     log.Info().Msg("hello world")
-//     // Output: {"t":1494567715,"p":"info","m":"hello world"}
-//
-// Log with no level and message:
-//
-//     log.Log().Str("foo","bar").Msg("")
-//     // Output: {"time":1494567715,"foo":"bar"}
-//
-// Add contextual fields to global Logger:
-//
-//     log.Logger = log.With().Str("foo", "bar").Logger()
-//
-// Sample logs:
-//
-//     sampled := log.Sample(&logger.BasicSampler{N: 10})
-//     sampled.Info().Msg("will be logged every 10 messages")
-//
-// Log with contextual hooks:
-//
-//     // Create the hook:
-//     type SeverityHook struct{}
-//
-//     func (h SeverityHook) Run(e *logger.Event, level logger.Level, msg string) {
-//          if level != logger.NoLevel {
-//              e.Str("severity", level.String())
-//          }
-//     }
-//
-//     // And use it:
-//     var h SeverityHook
-//     log := logger.New(os.Stdout).Hook(h)
-//     log.Warn().Msg("")
-//     // Output: {"level":"warn","severity":"warn"}
-//
-// # Caveats
-//
-// Field duplication:
-//
-// There is no fields deduplication out-of-the-box.
-// Using the same key multiple times creates new key in final JSON each time.
-//
-//     logger := logger.New(os.Stderr).With().Timestamp().Logger()
-//     logger.Info().
-//            Timestamp().
-//            Msg("dup")
-//     // Output: {"level":"info","time":1494567715,"time":1494567715,"message":"dup"}
-//
-// In this case, many consumers will take the last value,
-// but this is not guaranteed; check yours if in doubt.
-//
-// Concurrency safety:
-//
-// Be careful when calling UpdateContext. It is not concurrency safe. Use the With method to create a child logger:
-//
-//     func handler(w http.ResponseWriter, r *http.Request) {
-//         // Create a child logger for concurrency safety
-//         logger := log.Logger.With().Logger()
-//
-//         // Add context fields, for example User-Agent from HTTP headers
-//         logger.UpdateContext(func(c logger.Context) logger.Context {
-//             ...
-//         })
-//     }
+// Both styles can be mixed. The geth-style methods internally use the
+// zero-allocation Event system for high performance.
 package logger
 
 import (
@@ -144,7 +48,7 @@ const (
 	// Disabled disables the logger.
 	Disabled
 
-	// TraceLevel defines trace log level.
+	// TraceLevel defines trace level.
 	TraceLevel Level = -1
 	// Values less than TraceLevel are handled as numbers.
 )
@@ -174,7 +78,6 @@ func (l Level) String() string {
 }
 
 // ParseLevel converts a level string into a logger Level value.
-// returns an error if the input string does not match known values.
 func ParseLevel(levelStr string) (Level, error) {
 	switch {
 	case strings.EqualFold(levelStr, LevelFieldMarshalFunc(TraceLevel)):
@@ -206,7 +109,7 @@ func ParseLevel(levelStr string) (Level, error) {
 	return Level(i), nil
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler to allow for easy reading from toml/yaml/json formats
+// UnmarshalText implements encoding.TextUnmarshaler
 func (l *Level) UnmarshalText(text []byte) error {
 	if l == nil {
 		return errors.New("can't unmarshal a nil *Level")
@@ -216,16 +119,13 @@ func (l *Level) UnmarshalText(text []byte) error {
 	return err
 }
 
-// MarshalText implements encoding.TextMarshaler to allow for easy writing into toml/yaml/json formats
+// MarshalText implements encoding.TextMarshaler
 func (l Level) MarshalText() ([]byte, error) {
 	return []byte(LevelFieldMarshalFunc(l)), nil
 }
 
-// A Logger represents an active logging object that generates lines
-// of JSON output to an io.Writer. Each logging operation makes a single
-// call to the Writer's Write method. There is no guarantee on access
-// serialization to the Writer. If your Writer is not thread safe,
-// you may consider a sync wrapper.
+// Logger represents an active logging object that generates lines
+// of JSON output to an io.Writer.
 type Logger struct {
 	w       LevelWriter
 	level   Level
@@ -236,14 +136,24 @@ type Logger struct {
 	ctx     context.Context
 }
 
-// New creates a root logger with given output writer. If the output writer implements
-// the LevelWriter interface, the WriteLevel method will be called instead of the Write
-// one.
+// New creates a new child logger with the given context key-value pairs.
+// This is the geth-style constructor for creating loggers with context.
 //
-// Each logging operation makes a single call to the Writer's Write method. There is no
-// guarantee on access serialization to the Writer. If your Writer is not thread safe,
-// you may consider using sync wrapper.
-func New(w io.Writer) Logger {
+//	log := logger.New("component", "myapp", "version", "1.0")
+//	log.Info("started")
+func New(ctx ...any) Logger {
+	l := NewWriter(os.Stderr).With().Timestamp().Logger()
+	if len(ctx) > 0 {
+		return l.With().Fields(ctx).Logger()
+	}
+	return l
+}
+
+// NewWriter creates a root logger with given output writer.
+// Use this when you need to specify a custom output destination.
+//
+//	log := logger.NewWriter(os.Stderr).With().Timestamp().Logger()
+func NewWriter(w io.Writer) Logger {
 	if w == nil {
 		w = io.Discard
 	}
@@ -254,14 +164,14 @@ func New(w io.Writer) Logger {
 	return Logger{w: lw, level: TraceLevel}
 }
 
-// Nop returns a disabled logger for which all operation are no-op.
+// Nop returns a disabled logger for which all operations are no-op.
 func Nop() Logger {
-	return New(nil).Level(Disabled)
+	return NewWriter(nil).Level(Disabled)
 }
 
 // Output duplicates the current logger and sets w as its output.
 func (l Logger) Output(w io.Writer) Logger {
-	l2 := New(w)
+	l2 := NewWriter(w)
 	l2.level = l.level
 	l2.sampler = l.sampler
 	l2.stack = l.stack
@@ -276,23 +186,20 @@ func (l Logger) Output(w io.Writer) Logger {
 }
 
 // With creates a child logger with the field added to its context.
+// Returns a Context for method chaining.
 func (l Logger) With() Context {
 	context := l.context
 	l.context = make([]byte, 0, 500)
 	if context != nil {
 		l.context = append(l.context, context...)
 	} else {
-		// This is needed for AppendKey to not check len of input
-		// thus making it inlinable
 		l.context = enc.AppendBeginMarker(l.context)
 	}
 	return Context{l}
 }
 
 // UpdateContext updates the internal logger's context.
-//
 // Caution: This method is not concurrency safe.
-// Use the With method to create a child logger before modifying the context from concurrent goroutines.
 func (l *Logger) UpdateContext(update func(c Context) Context) {
 	if l == disabledLogger {
 		return
@@ -318,6 +225,28 @@ func (l Logger) GetLevel() Level {
 	return l.level
 }
 
+// New creates a child logger with the given context key-value pairs.
+// This is a method for geth compatibility - creates a child logger with additional context.
+//
+//	childLog := log.New("component", "myapp")
+func (l Logger) New(ctx ...any) Logger {
+	if len(ctx) > 0 {
+		return l.With().Fields(ctx).Logger()
+	}
+	return l
+}
+
+// Enabled checks if the given level is enabled for this logger.
+// This is used for conditional logging to avoid expensive argument evaluation.
+func (l Logger) Enabled(ctx context.Context, level Level) bool {
+	return l.should(level)
+}
+
+// IsZero returns true if this is a zero-value logger (uninitialized).
+func (l Logger) IsZero() bool {
+	return l.w == nil
+}
+
 // Sample returns a logger with the s sampler.
 func (l Logger) Sample(s Sampler) Logger {
 	l.sampler = s
@@ -335,99 +264,146 @@ func (l Logger) Hook(hooks ...Hook) Logger {
 	return l
 }
 
-// Trace starts a new message with trace level.
-//
+// --- Geth-style variadic logging methods ---
+// These methods accept a message and variadic key-value pairs.
+
+// Trace logs a message at trace level with optional key-value pairs.
+func (l *Logger) Trace(msg string, ctx ...any) {
+	if e := l.newEvent(TraceLevel, nil); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Debug logs a message at debug level with optional key-value pairs.
+func (l *Logger) Debug(msg string, ctx ...any) {
+	if e := l.newEvent(DebugLevel, nil); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Info logs a message at info level with optional key-value pairs.
+func (l *Logger) Info(msg string, ctx ...any) {
+	if e := l.newEvent(InfoLevel, nil); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Warn logs a message at warn level with optional key-value pairs.
+func (l *Logger) Warn(msg string, ctx ...any) {
+	if e := l.newEvent(WarnLevel, nil); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Error logs a message at error level with optional key-value pairs.
+func (l *Logger) Error(msg string, ctx ...any) {
+	if e := l.newEvent(ErrorLevel, nil); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Fatal logs a message at fatal level with optional key-value pairs and exits.
+func (l *Logger) Fatal(msg string, ctx ...any) {
+	if e := l.newEvent(FatalLevel, func(msg string) {
+		if closer, ok := l.w.(io.Closer); ok {
+			closer.Close()
+		}
+		os.Exit(1)
+	}); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Panic logs a message at panic level with optional key-value pairs and panics.
+func (l *Logger) Panic(msg string, ctx ...any) {
+	if e := l.newEvent(PanicLevel, func(msg string) { panic(msg) }); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// Crit logs a message at critical level (alias for Fatal).
+func (l *Logger) Crit(msg string, ctx ...any) {
+	l.Fatal(msg, ctx...)
+}
+
+// Log logs a message at the specified level with optional key-value pairs.
+func (l *Logger) Log(level Level, msg string, ctx ...any) {
+	if e := l.newEvent(level, nil); e != nil {
+		applyContext(e, ctx).Msg(msg)
+	}
+}
+
+// --- Method chaining API (zero-allocation) ---
+// These methods return an Event for building log messages.
+
+// TraceEvent starts a new message with trace level.
 // You must call Msg on the returned event in order to send the event.
-func (l *Logger) Trace() *Event {
+func (l *Logger) TraceEvent() *Event {
 	return l.newEvent(TraceLevel, nil)
 }
 
-// Debug starts a new message with debug level.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Debug() *Event {
+// DebugEvent starts a new message with debug level.
+func (l *Logger) DebugEvent() *Event {
 	return l.newEvent(DebugLevel, nil)
 }
 
-// Info starts a new message with info level.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Info() *Event {
+// InfoEvent starts a new message with info level.
+func (l *Logger) InfoEvent() *Event {
 	return l.newEvent(InfoLevel, nil)
 }
 
-// Warn starts a new message with warn level.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Warn() *Event {
+// WarnEvent starts a new message with warn level.
+func (l *Logger) WarnEvent() *Event {
 	return l.newEvent(WarnLevel, nil)
 }
 
-// Error starts a new message with error level.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Error() *Event {
+// ErrorEvent starts a new message with error level.
+func (l *Logger) ErrorEvent() *Event {
 	return l.newEvent(ErrorLevel, nil)
 }
 
-// Err starts a new message with error level with err as a field if not nil or
-// with info level if err is nil.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Err(err error) *Event {
-	if err != nil {
-		return l.Error().Err(err)
-	}
-
-	return l.Info()
-}
-
-// Fatal starts a new message with fatal level. The os.Exit(1) function
-// is called by the Msg method, which terminates the program immediately.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Fatal() *Event {
+// FatalEvent starts a new message with fatal level.
+func (l *Logger) FatalEvent() *Event {
 	return l.newEvent(FatalLevel, func(msg string) {
 		if closer, ok := l.w.(io.Closer); ok {
-			// Close the writer to flush any buffered message. Otherwise the message
-			// will be lost as os.Exit() terminates the program immediately.
 			closer.Close()
 		}
 		os.Exit(1)
 	})
 }
 
-// Panic starts a new message with panic level. The panic() function
-// is called by the Msg method, which stops the ordinary flow of a goroutine.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Panic() *Event {
+// PanicEvent starts a new message with panic level.
+func (l *Logger) PanicEvent() *Event {
 	return l.newEvent(PanicLevel, func(msg string) { panic(msg) })
 }
 
-// WithLevel starts a new message with level. Unlike Fatal and Panic
-// methods, WithLevel does not terminate the program or stop the ordinary
-// flow of a goroutine when used with their respective levels.
-//
-// You must call Msg on the returned event in order to send the event.
+// Err starts a new message with error level with err as a field if not nil.
+func (l *Logger) Err(err error) *Event {
+	if err != nil {
+		return l.ErrorEvent().Err(err)
+	}
+	return l.InfoEvent()
+}
+
+// WithLevel starts a new message with the specified level.
 func (l *Logger) WithLevel(level Level) *Event {
 	switch level {
 	case TraceLevel:
-		return l.Trace()
+		return l.TraceEvent()
 	case DebugLevel:
-		return l.Debug()
+		return l.DebugEvent()
 	case InfoLevel:
-		return l.Info()
+		return l.InfoEvent()
 	case WarnLevel:
-		return l.Warn()
+		return l.WarnEvent()
 	case ErrorLevel:
-		return l.Error()
+		return l.ErrorEvent()
 	case FatalLevel:
 		return l.newEvent(FatalLevel, nil)
 	case PanicLevel:
 		return l.newEvent(PanicLevel, nil)
 	case NoLevel:
-		return l.Log()
+		return l.LogEvent()
 	case Disabled:
 		return nil
 	default:
@@ -435,47 +411,32 @@ func (l *Logger) WithLevel(level Level) *Event {
 	}
 }
 
-// Log starts a new message with no level. Setting GlobalLevel to Disabled
-// will still disable events produced by this method.
-//
-// You must call Msg on the returned event in order to send the event.
-func (l *Logger) Log() *Event {
+// LogEvent starts a new message with no level.
+func (l *Logger) LogEvent() *Event {
 	return l.newEvent(NoLevel, nil)
 }
 
-// Print sends a log event using debug level and no extra field.
-// Arguments are handled in the manner of fmt.Print.
+// Print sends a log event using debug level.
 func (l *Logger) Print(v ...interface{}) {
-	if e := l.Debug(); e.Enabled() {
+	if e := l.DebugEvent(); e.Enabled() {
 		e.CallerSkipFrame(1).Msg(fmt.Sprint(v...))
 	}
 }
 
-// Printf sends a log event using debug level and no extra field.
-// Arguments are handled in the manner of fmt.Printf.
+// Printf sends a log event using debug level.
 func (l *Logger) Printf(format string, v ...interface{}) {
-	if e := l.Debug(); e.Enabled() {
+	if e := l.DebugEvent(); e.Enabled() {
 		e.CallerSkipFrame(1).Msg(fmt.Sprintf(format, v...))
 	}
 }
 
-// Println sends a log event using debug level and no extra field.
-// Arguments are handled in the manner of fmt.Println.
-func (l *Logger) Println(v ...interface{}) {
-	if e := l.Debug(); e.Enabled() {
-		e.CallerSkipFrame(1).Msg(fmt.Sprintln(v...))
-	}
-}
-
-// Write implements the io.Writer interface. This is useful to set as a writer
-// for the standard library log.
+// Write implements the io.Writer interface.
 func (l Logger) Write(p []byte) (n int, err error) {
 	n = len(p)
 	if n > 0 && p[n-1] == '\n' {
-		// Trim CR added by stdlog.
 		p = p[0 : n-1]
 	}
-	l.Log().CallerSkipFrame(1).Msg(string(p))
+	l.LogEvent().CallerSkipFrame(1).Msg(string(p))
 	return
 }
 
@@ -502,7 +463,6 @@ func (l *Logger) scratchEvent() *Event {
 	return newEvent(LevelWriterAdapter{io.Discard}, DebugLevel, l.stack, l.ctx, l.hooks)
 }
 
-// should returns true if the log event should be logged.
 func (l *Logger) should(lvl Level) bool {
 	if l.w == nil {
 		return false
@@ -515,3 +475,4 @@ func (l *Logger) should(lvl Level) bool {
 	}
 	return true
 }
+

@@ -9,6 +9,18 @@ import (
 	"time"
 )
 
+// Level aliases for geth compatibility.
+// These are Level type (not slog.Level) for use with Logger.Enabled().
+const (
+	LevelTrace = TraceLevel
+	LevelDebug = DebugLevel
+	LevelInfo  = InfoLevel
+	LevelWarn  = WarnLevel
+	LevelError = ErrorLevel
+	LevelFatal = FatalLevel
+	LevelPanic = PanicLevel
+)
+
 // Field represents a key-value pair for geth-style structured logging.
 // This provides compatibility with go-ethereum's logging patterns.
 type Field struct {
@@ -51,7 +63,7 @@ func Stack(key string) Field {
 }
 
 // defaultLogger is the global logger for geth-style functions
-var defaultLogger = New(os.Stderr).With().Timestamp().Logger()
+var defaultLogger = NewWriter(os.Stderr).With().Timestamp().Logger()
 
 // SetDefault sets the default logger for geth-style functions
 func SetDefault(l Logger) {
@@ -140,32 +152,32 @@ func applyContext(e *Event, ctx []any) *Event {
 
 // Trace logs at trace level with geth-style context
 func Trace(msg string, ctx ...any) {
-	applyContext(defaultLogger.Trace(), ctx).Msg(msg)
+	applyContext(defaultLogger.TraceEvent(), ctx).Msg(msg)
 }
 
 // Debug logs at debug level with geth-style context
 func Debug(msg string, ctx ...any) {
-	applyContext(defaultLogger.Debug(), ctx).Msg(msg)
+	applyContext(defaultLogger.DebugEvent(), ctx).Msg(msg)
 }
 
 // Info logs at info level with geth-style context
 func Info(msg string, ctx ...any) {
-	applyContext(defaultLogger.Info(), ctx).Msg(msg)
+	applyContext(defaultLogger.InfoEvent(), ctx).Msg(msg)
 }
 
 // Warn logs at warn level with geth-style context
 func Warn(msg string, ctx ...any) {
-	applyContext(defaultLogger.Warn(), ctx).Msg(msg)
+	applyContext(defaultLogger.WarnEvent(), ctx).Msg(msg)
 }
 
 // Error logs at error level with geth-style context
 func Error(msg string, ctx ...any) {
-	applyContext(defaultLogger.Error(), ctx).Msg(msg)
+	applyContext(defaultLogger.ErrorEvent(), ctx).Msg(msg)
 }
 
 // Fatal logs at fatal level with geth-style context and exits
 func Fatal(msg string, ctx ...any) {
-	applyContext(defaultLogger.Fatal(), ctx).Msg(msg)
+	applyContext(defaultLogger.FatalEvent(), ctx).Msg(msg)
 }
 
 // Crit is an alias for Fatal (geth compatibility)
@@ -184,6 +196,12 @@ func NewNoOpLogger() Logger {
 }
 
 // NewTestLogger returns a logger suitable for testing.
-func NewTestLogger() Logger {
-	return New(os.Stderr).With().Timestamp().Logger()
+// If a level is provided, the logger is set to that level.
+func NewTestLogger(level ...Level) Logger {
+	l := NewWriter(os.Stderr).With().Timestamp().Logger()
+	if len(level) > 0 {
+		l = l.Level(level[0])
+	}
+	return l
 }
+

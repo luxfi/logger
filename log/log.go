@@ -45,6 +45,9 @@ type Logger interface {
 	// With returns a new logger with the given fields added to context.
 	With(args ...interface{}) Logger
 
+	// New creates a new child logger with the given context fields (geth compatibility).
+	New(ctx ...interface{}) Logger
+
 	// Enabled returns true if the given level is enabled.
 	Enabled(level Level) bool
 }
@@ -64,13 +67,13 @@ const (
 )
 
 // baseLogger is the underlying zerolog logger.
-var baseLogger = logger.New(os.Stderr).With().Timestamp().Logger()
+var baseLogger = logger.NewWriter(os.Stderr).With().Timestamp().Logger()
 
 // L is the global logger instance implementing Logger interface.
 var L Logger = &zeroLogWrapper{l: baseLogger}
 
-// NoLog is a disabled logger for which all operations are no-op.
-var NoLog Logger = &nopLogger{}
+// Nop is a disabled logger instance for which all operations are no-op.
+var Nop Logger = &NoLog{}
 
 // Field is a function that adds a field to a log event.
 type Field func(*logger.Event)
@@ -236,11 +239,6 @@ func DefaultFactory() Factory {
 	return NewLogger
 }
 
-// NewNoOpLogger returns a logger that discards all output.
-func NewNoOpLogger() Logger {
-	return NoLog
-}
-
 // applyArgs applies fields or key-value pairs to an event.
 // Supports both Field functions and alternating key-value pairs.
 func applyArgs(e *logger.Event, args []interface{}) {
@@ -318,12 +316,12 @@ func addFieldToEvent(e *logger.Event, key string, val interface{}) {
 
 // NewLogger creates a new Logger instance.
 func NewLogger() Logger {
-	return &zeroLogWrapper{l: logger.New(os.Stderr).With().Timestamp().Logger()}
+	return &zeroLogWrapper{l: logger.NewWriter(os.Stderr).With().Timestamp().Logger()}
 }
 
 // NewLoggerWithOutput creates a new Logger with a custom output.
 func NewLoggerWithOutput(w io.Writer) Logger {
-	return &zeroLogWrapper{l: logger.New(w).With().Timestamp().Logger()}
+	return &zeroLogWrapper{l: logger.NewWriter(w).With().Timestamp().Logger()}
 }
 
 // zeroLogWrapper methods
@@ -401,23 +399,29 @@ func (z *zeroLogWrapper) With(args ...interface{}) Logger {
 	}
 }
 
+func (z *zeroLogWrapper) New(ctx ...interface{}) Logger {
+	// New is an alias for With (geth compatibility)
+	return z.With(ctx...)
+}
+
 func (z *zeroLogWrapper) Enabled(level Level) bool {
 	return z.l.GetLevel() <= level
 }
 
-// nopLogger is a no-op logger implementation.
-type nopLogger struct{}
+// NoLog is a no-op logger implementation.
+type NoLog struct{}
 
-func (n *nopLogger) Trace(msg string, args ...interface{}) {}
-func (n *nopLogger) Debug(msg string, args ...interface{}) {}
-func (n *nopLogger) Info(msg string, args ...interface{})  {}
-func (n *nopLogger) Warn(msg string, args ...interface{})  {}
-func (n *nopLogger) Error(msg string, args ...interface{}) {}
-func (n *nopLogger) Fatal(msg string, args ...interface{}) {}
-func (n *nopLogger) Panic(msg string, args ...interface{}) {}
-func (n *nopLogger) Verbo(msg string, args ...interface{}) {}
-func (n *nopLogger) With(args ...interface{}) Logger       { return n }
-func (n *nopLogger) Enabled(level Level) bool              { return false }
+func (n NoLog) Trace(msg string, args ...interface{}) {}
+func (n NoLog) Debug(msg string, args ...interface{}) {}
+func (n NoLog) Info(msg string, args ...interface{})  {}
+func (n NoLog) Warn(msg string, args ...interface{})  {}
+func (n NoLog) Error(msg string, args ...interface{}) {}
+func (n NoLog) Fatal(msg string, args ...interface{}) {}
+func (n NoLog) Panic(msg string, args ...interface{}) {}
+func (n NoLog) Verbo(msg string, args ...interface{}) {}
+func (n NoLog) With(args ...interface{}) Logger       { return n }
+func (n NoLog) New(ctx ...interface{}) Logger         { return n }
+func (n NoLog) Enabled(level Level) bool              { return false }
 
 // Global logging functions
 
@@ -499,7 +503,7 @@ func Crit(msg string, args ...interface{}) {
 
 // NewNoOpLogger returns a no-op logger.
 func NewNoOpLogger() Logger {
-	return NoLog
+	return NoLog{}
 }
 
 // Root returns the default logger (geth compatibility).
