@@ -142,7 +142,7 @@ type Logger struct {
 //
 //	log := logger.New("component", "myapp", "version", "1.0")
 //	log.Info("started")
-func New(ctx ...any) Logger {
+func New(ctx ...interface{}) Logger {
 	l := NewWriter(os.Stderr).With().Timestamp().Logger()
 	if len(ctx) > 0 {
 		return l.With().Fields(ctx).Logger()
@@ -230,7 +230,7 @@ func (l Logger) GetLevel() Level {
 // This is a method for geth compatibility - creates a child logger with additional context.
 //
 //	childLog := log.New("component", "myapp")
-func (l Logger) New(ctx ...any) Logger {
+func (l Logger) New(ctx ...interface{}) Logger {
 	if len(ctx) > 0 {
 		return l.With().Fields(ctx).Logger()
 	}
@@ -286,42 +286,42 @@ func (l Logger) Hook(hooks ...Hook) Logger {
 // These methods accept a message and variadic key-value pairs.
 
 // Trace logs a message at trace level with optional key-value pairs.
-func (l Logger) Trace(msg string, ctx ...any) {
+func (l Logger) Trace(msg string, ctx ...interface{}) {
 	if e := l.newEvent(TraceLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Debug logs a message at debug level with optional key-value pairs.
-func (l Logger) Debug(msg string, ctx ...any) {
+func (l Logger) Debug(msg string, ctx ...interface{}) {
 	if e := l.newEvent(DebugLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Info logs a message at info level with optional key-value pairs.
-func (l Logger) Info(msg string, ctx ...any) {
+func (l Logger) Info(msg string, ctx ...interface{}) {
 	if e := l.newEvent(InfoLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Warn logs a message at warn level with optional key-value pairs.
-func (l Logger) Warn(msg string, ctx ...any) {
+func (l Logger) Warn(msg string, ctx ...interface{}) {
 	if e := l.newEvent(WarnLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Error logs a message at error level with optional key-value pairs.
-func (l Logger) Error(msg string, ctx ...any) {
+func (l Logger) Error(msg string, ctx ...interface{}) {
 	if e := l.newEvent(ErrorLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Fatal logs a message at fatal level with optional key-value pairs and exits.
-func (l Logger) Fatal(msg string, ctx ...any) {
+func (l Logger) Fatal(msg string, ctx ...interface{}) {
 	if e := l.newEvent(FatalLevel, func(msg string) {
 		if closer, ok := l.w.(io.Closer); ok {
 			closer.Close()
@@ -333,19 +333,19 @@ func (l Logger) Fatal(msg string, ctx ...any) {
 }
 
 // Panic logs a message at panic level with optional key-value pairs and panics.
-func (l Logger) Panic(msg string, ctx ...any) {
+func (l Logger) Panic(msg string, ctx ...interface{}) {
 	if e := l.newEvent(PanicLevel, func(msg string) { panic(msg) }); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Crit logs a message at critical level (alias for Fatal).
-func (l Logger) Crit(msg string, ctx ...any) {
+func (l Logger) Crit(msg string, ctx ...interface{}) {
 	l.Fatal(msg, ctx...)
 }
 
 // Log logs a message at the specified level with optional key-value pairs.
-func (l Logger) Log(level Level, msg string, ctx ...any) {
+func (l Logger) Log(level Level, msg string, ctx ...interface{}) {
 	if e := l.newEvent(level, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}

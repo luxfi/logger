@@ -74,7 +74,7 @@ func Root() Logger {
 
 // applyContext applies geth-style key-value pairs to an Event.
 // Accepts alternating key-value pairs: key1, val1, key2, val2, ...
-func applyContext(e *Event, ctx []any) *Event {
+func applyContext(e *Event, ctx []interface{}) *Event {
 	if e == nil {
 		return nil
 	}
@@ -148,42 +148,42 @@ func applyContext(e *Event, ctx []any) *Event {
 // These accept alternating key-value pairs: msg, key1, val1, key2, val2, ...
 
 // Trace logs at trace level with geth-style context
-func Trace(msg string, ctx ...any) {
+func Trace(msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.TraceEvent(), ctx).Msg(msg)
 }
 
 // Debug logs at debug level with geth-style context
-func Debug(msg string, ctx ...any) {
+func Debug(msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.DebugEvent(), ctx).Msg(msg)
 }
 
 // Info logs at info level with geth-style context
-func Info(msg string, ctx ...any) {
+func Info(msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.InfoEvent(), ctx).Msg(msg)
 }
 
 // Warn logs at warn level with geth-style context
-func Warn(msg string, ctx ...any) {
+func Warn(msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.WarnEvent(), ctx).Msg(msg)
 }
 
 // Error logs at error level with geth-style context
-func Error(msg string, ctx ...any) {
+func Error(msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.ErrorEvent(), ctx).Msg(msg)
 }
 
 // Fatal logs at fatal level with geth-style context and exits
-func Fatal(msg string, ctx ...any) {
+func Fatal(msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.FatalEvent(), ctx).Msg(msg)
 }
 
 // Crit is an alias for Fatal (geth compatibility)
-func Crit(msg string, ctx ...any) {
+func Crit(msg string, ctx ...interface{}) {
 	Fatal(msg, ctx...)
 }
 
 // Log logs at the specified level with geth-style context
-func Log(level Level, msg string, ctx ...any) {
+func Log(level Level, msg string, ctx ...interface{}) {
 	applyContext(defaultLogger.WithLevel(level), ctx).Msg(msg)
 }
 

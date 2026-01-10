@@ -51,6 +51,12 @@ type Logger interface {
 
 	// Enabled returns true if the given level is enabled.
 	Enabled(ctx context.Context, level Level) bool
+
+	// RecoverAndPanic runs the function and recovers from any panic, logging it before re-panicking.
+	RecoverAndPanic(fn func())
+
+	// SetLogLevel sets the log level from a string.
+	SetLogLevel(level string) error
 }
 
 // Level represents log level (slog.Level for geth/coreth compatibility).
@@ -68,11 +74,11 @@ const (
 	LevelPanic Level = logger.SlogLevelCrit // Alias for LevelCrit
 )
 
-// baseLogger is the underlying zerolog logger.
+// baseLogger is the underlying logger instance.
 var baseLogger = logger.NewWriter(os.Stderr).With().Timestamp().Logger()
 
 // L is the global logger instance implementing Logger interface.
-var L Logger = &zeroLogWrapper{l: baseLogger}
+var L Logger = &wrappedLogger{l: baseLogger}
 
 // Nop is a disabled logger instance for which all operations are no-op.
 var Nop Logger = &NoLog{}
@@ -80,8 +86,8 @@ var Nop Logger = &NoLog{}
 // Field is a function that adds a field to a log event.
 type Field func(*logger.Event)
 
-// zeroLogWrapper wraps logger.Logger to implement Logger interface.
-type zeroLogWrapper struct {
+// wrappedLogger wraps logger.Logger to implement Logger interface.
+type wrappedLogger struct {
 	l      logger.Logger
 	fields []Field
 }
@@ -318,17 +324,17 @@ func addFieldToEvent(e *logger.Event, key string, val interface{}) {
 
 // NewLogger creates a new Logger instance.
 func NewLogger() Logger {
-	return &zeroLogWrapper{l: logger.NewWriter(os.Stderr).With().Timestamp().Logger()}
+	return &wrappedLogger{l: logger.NewWriter(os.Stderr).With().Timestamp().Logger()}
 }
 
 // NewLoggerWithOutput creates a new Logger with a custom output.
 func NewLoggerWithOutput(w io.Writer) Logger {
-	return &zeroLogWrapper{l: logger.NewWriter(w).With().Timestamp().Logger()}
+	return &wrappedLogger{l: logger.NewWriter(w).With().Timestamp().Logger()}
 }
 
-// zeroLogWrapper methods
+// wrappedLogger methods
 
-func (z *zeroLogWrapper) log(level logger.Level, msg string, args []interface{}) {
+func (z *wrappedLogger) log(level logger.Level, msg string, args []interface{}) {
 	e := z.l.WithLevel(level)
 	for _, f := range z.fields {
 		f(e)
@@ -337,39 +343,39 @@ func (z *zeroLogWrapper) log(level logger.Level, msg string, args []interface{})
 	e.Msg(msg)
 }
 
-func (z *zeroLogWrapper) Trace(msg string, args ...interface{}) {
+func (z *wrappedLogger) Trace(msg string, args ...interface{}) {
 	z.log(logger.TraceLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Debug(msg string, args ...interface{}) {
+func (z *wrappedLogger) Debug(msg string, args ...interface{}) {
 	z.log(logger.DebugLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Info(msg string, args ...interface{}) {
+func (z *wrappedLogger) Info(msg string, args ...interface{}) {
 	z.log(logger.InfoLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Warn(msg string, args ...interface{}) {
+func (z *wrappedLogger) Warn(msg string, args ...interface{}) {
 	z.log(logger.WarnLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Error(msg string, args ...interface{}) {
+func (z *wrappedLogger) Error(msg string, args ...interface{}) {
 	z.log(logger.ErrorLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Fatal(msg string, args ...interface{}) {
+func (z *wrappedLogger) Fatal(msg string, args ...interface{}) {
 	z.log(logger.FatalLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Panic(msg string, args ...interface{}) {
+func (z *wrappedLogger) Panic(msg string, args ...interface{}) {
 	z.log(logger.PanicLevel, msg, args)
 }
 
-func (z *zeroLogWrapper) Verbo(msg string, args ...interface{}) {
+func (z *wrappedLogger) Verbo(msg string, args ...interface{}) {
 	z.Trace(msg, args...)
 }
 
-func (z *zeroLogWrapper) With(args ...interface{}) Logger {
+func (z *wrappedLogger) With(args ...interface{}) Logger {
 	// Convert args to fields
 	newFields := make([]Field, 0, len(z.fields))
 	newFields = append(newFields, z.fields...)
@@ -395,19 +401,38 @@ func (z *zeroLogWrapper) With(args ...interface{}) Logger {
 		i++
 	}
 
-	return &zeroLogWrapper{
+	return &wrappedLogger{
 		l:      z.l,
 		fields: newFields,
 	}
 }
 
-func (z *zeroLogWrapper) New(ctx ...interface{}) Logger {
+func (z *wrappedLogger) New(ctx ...interface{}) Logger {
 	// New is an alias for With (geth compatibility)
 	return z.With(ctx...)
 }
 
-func (z *zeroLogWrapper) Enabled(ctx context.Context, level Level) bool {
+func (z *wrappedLogger) Enabled(ctx context.Context, level Level) bool {
 	return z.l.Enabled(ctx, level)
+}
+
+func (z *wrappedLogger) RecoverAndPanic(fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			z.Error("panic recovered", "panic", r)
+			panic(r)
+		}
+	}()
+	fn()
+}
+
+func (z *wrappedLogger) SetLogLevel(level string) error {
+	lvl, err := ToLevel(level)
+	if err != nil {
+		return err
+	}
+	SetGlobalLevel(lvl)
+	return nil
 }
 
 // NoLog is a no-op logger implementation.
@@ -424,6 +449,18 @@ func (n NoLog) Verbo(msg string, args ...interface{}) {}
 func (n NoLog) With(args ...interface{}) Logger       { return n }
 func (n NoLog) New(ctx ...interface{}) Logger         { return n }
 func (n NoLog) Enabled(ctx context.Context, level Level) bool { return false }
+func (n NoLog) RecoverAndPanic(fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			panic(r)
+		}
+	}()
+	fn()
+}
+
+func (n NoLog) SetLogLevel(level string) error {
+	return nil // No-op
+}
 
 // Global logging functions
 
@@ -685,14 +722,53 @@ func (w *slogLoggerWrapper) Verbo(msg string, args ...interface{}) { w.l.Trace(m
 func (w *slogLoggerWrapper) With(args ...interface{}) Logger       { return &slogLoggerWrapper{l: w.l.With(args...)} }
 func (w *slogLoggerWrapper) New(ctx ...interface{}) Logger         { return &slogLoggerWrapper{l: w.l.New(ctx...)} }
 func (w *slogLoggerWrapper) Enabled(ctx context.Context, level Level) bool { return w.l.Enabled(ctx, level) }
+func (w *slogLoggerWrapper) RecoverAndPanic(fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			w.Error("panic recovered", "panic", r)
+			panic(r)
+		}
+	}()
+	fn()
+}
+
+func (w *slogLoggerWrapper) SetLogLevel(level string) error {
+	lvl, err := ToLevel(level)
+	if err != nil {
+		return err
+	}
+	SetGlobalLevel(lvl)
+	return nil
+}
 
 // LvlFromString returns the appropriate level from a string name.
 func LvlFromString(lvlString string) (slog.Level, error) {
 	return logger.LvlFromString(lvlString)
 }
 
+// InitLogger creates a new logger with the specified configuration.
+// This is used by coreth to initialize the VM logger.
+func InitLogger(chainAlias string, logLevel string, jsonFormat bool, writer io.Writer) (Logger, error) {
+	level, err := ToLevel(logLevel)
+	if err != nil {
+		level = LevelInfo
+	}
+
+	var handler slog.Handler
+	if jsonFormat {
+		handler = JSONHandlerWithLevel(writer, level)
+	} else {
+		handler = NewTerminalHandlerWithLevel(writer, level, false)
+	}
+
+	slogLogger := NewSlogLogger(NewGlogHandler(handler))
+	wrapped := &slogLoggerWrapper{l: slogLogger}
+	return wrapped.With("chain", chainAlias), nil
+}
+
 // NewTestLogger returns a logger suitable for testing.
-func NewTestLogger(level ...Level) logger.Logger {
+func NewTestLogger(level ...Level) Logger {
+	var l logger.Logger
 	if len(level) > 0 {
 		// Convert slog.Level to logger.Level
 		var internalLevel logger.Level
@@ -711,7 +787,9 @@ func NewTestLogger(level ...Level) logger.Logger {
 		default:
 			internalLevel = logger.FatalLevel
 		}
-		return logger.NewTestLogger(internalLevel)
+		l = logger.NewTestLogger(internalLevel)
+	} else {
+		l = logger.NewTestLogger()
 	}
-	return logger.NewTestLogger()
+	return &wrappedLogger{l: l}
 }

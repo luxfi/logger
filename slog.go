@@ -45,7 +45,7 @@ const (
 	SlogLevelCrit             = slogLevelCrit
 )
 
-// Level aliases for geth/zerolog compatibility.
+// Level aliases for geth/logger compatibility.
 // These are logger.Level type (int8) for use with Logger.Enabled().
 const (
 	LevelTrace Level = TraceLevel
@@ -90,7 +90,7 @@ type SlogLogger interface {
 	Warn(msg string, ctx ...interface{})
 	Error(msg string, ctx ...interface{})
 	Crit(msg string, ctx ...interface{})
-	Write(level slog.Level, msg string, attrs ...any)
+	Write(level slog.Level, msg string, attrs ...interface{})
 	Enabled(ctx context.Context, level slog.Level) bool
 	Handler() slog.Handler
 }
@@ -128,7 +128,7 @@ func NewLoggerFromHandler(h slog.Handler) SlogLogger {
 	return &slogLogger{inner: slog.New(h)}
 }
 
-func (l *slogLogger) Write(level slog.Level, msg string, attrs ...any) {
+func (l *slogLogger) Write(level slog.Level, msg string, attrs ...interface{}) {
 	if !l.inner.Enabled(context.Background(), level) {
 		return
 	}
@@ -142,7 +142,7 @@ func (l *slogLogger) Write(level slog.Level, msg string, attrs ...any) {
 	_ = l.inner.Handler().Handle(context.Background(), r)
 }
 
-func (l *slogLogger) Log(level slog.Level, msg string, attrs ...any) {
+func (l *slogLogger) Log(level slog.Level, msg string, attrs ...interface{}) {
 	l.Write(level, msg, attrs...)
 }
 

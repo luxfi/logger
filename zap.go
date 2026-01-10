@@ -12,11 +12,11 @@ import (
 )
 
 // NewZapLogger creates a Logger that writes using the same output as a zap.Logger.
-// This creates a zerolog-based Logger for compatibility with the Logger struct.
+// This creates a Logger for compatibility with the Logger struct.
 func NewZapLogger(z *zap.Logger) Logger {
-	// Extract the writer from zap and create a zerolog logger
+	// Extract the writer from zap and create a logger
 	// Since we can't easily extract the writer, use stderr as default
-	return New(os.Stderr).With().Timestamp().Logger()
+	return NewWriter(os.Stderr).With().Timestamp().Logger()
 }
 
 // SetGlobalLogger sets the global logger.
@@ -75,5 +75,5 @@ func NewZapLoggerWithConfig(level string, jsonFormat bool, writer io.Writer) (*z
 
 // NewLoggerWithWriter creates a Logger with the specified writer.
 func NewLoggerWithWriter(w io.Writer) Logger {
-	return New(w).With().Timestamp().Logger()
+	return NewWriter(w).With().Timestamp().Logger()
 }
