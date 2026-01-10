@@ -9,17 +9,8 @@ import (
 	"time"
 )
 
-// Level aliases for geth compatibility.
-// These are Level type (not slog.Level) for use with Logger.Enabled().
-const (
-	LevelTrace = TraceLevel
-	LevelDebug = DebugLevel
-	LevelInfo  = InfoLevel
-	LevelWarn  = WarnLevel
-	LevelError = ErrorLevel
-	LevelFatal = FatalLevel
-	LevelPanic = PanicLevel
-)
+// Level aliases for geth compatibility have been moved to slog.go
+// to avoid duplicate declarations.
 
 // Field represents a key-value pair for geth-style structured logging.
 // This provides compatibility with go-ethereum's logging patterns.

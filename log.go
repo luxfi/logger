@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -238,8 +239,25 @@ func (l Logger) New(ctx ...any) Logger {
 
 // Enabled checks if the given level is enabled for this logger.
 // This is used for conditional logging to avoid expensive argument evaluation.
-func (l Logger) Enabled(ctx context.Context, level Level) bool {
-	return l.should(level)
+// Accepts slog.Level for compatibility with geth's slog-based logging.
+func (l Logger) Enabled(ctx context.Context, level slog.Level) bool {
+	// Convert slog.Level to internal Level
+	var internalLevel Level
+	switch {
+	case level <= slogLevelTrace:
+		internalLevel = TraceLevel
+	case level <= slog.LevelDebug:
+		internalLevel = DebugLevel
+	case level <= slog.LevelInfo:
+		internalLevel = InfoLevel
+	case level <= slog.LevelWarn:
+		internalLevel = WarnLevel
+	case level <= slog.LevelError:
+		internalLevel = ErrorLevel
+	default:
+		internalLevel = FatalLevel
+	}
+	return l.should(internalLevel)
 }
 
 // IsZero returns true if this is a zero-value logger (uninitialized).
@@ -268,42 +286,42 @@ func (l Logger) Hook(hooks ...Hook) Logger {
 // These methods accept a message and variadic key-value pairs.
 
 // Trace logs a message at trace level with optional key-value pairs.
-func (l *Logger) Trace(msg string, ctx ...any) {
+func (l Logger) Trace(msg string, ctx ...any) {
 	if e := l.newEvent(TraceLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Debug logs a message at debug level with optional key-value pairs.
-func (l *Logger) Debug(msg string, ctx ...any) {
+func (l Logger) Debug(msg string, ctx ...any) {
 	if e := l.newEvent(DebugLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Info logs a message at info level with optional key-value pairs.
-func (l *Logger) Info(msg string, ctx ...any) {
+func (l Logger) Info(msg string, ctx ...any) {
 	if e := l.newEvent(InfoLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Warn logs a message at warn level with optional key-value pairs.
-func (l *Logger) Warn(msg string, ctx ...any) {
+func (l Logger) Warn(msg string, ctx ...any) {
 	if e := l.newEvent(WarnLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Error logs a message at error level with optional key-value pairs.
-func (l *Logger) Error(msg string, ctx ...any) {
+func (l Logger) Error(msg string, ctx ...any) {
 	if e := l.newEvent(ErrorLevel, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Fatal logs a message at fatal level with optional key-value pairs and exits.
-func (l *Logger) Fatal(msg string, ctx ...any) {
+func (l Logger) Fatal(msg string, ctx ...any) {
 	if e := l.newEvent(FatalLevel, func(msg string) {
 		if closer, ok := l.w.(io.Closer); ok {
 			closer.Close()
@@ -315,19 +333,19 @@ func (l *Logger) Fatal(msg string, ctx ...any) {
 }
 
 // Panic logs a message at panic level with optional key-value pairs and panics.
-func (l *Logger) Panic(msg string, ctx ...any) {
+func (l Logger) Panic(msg string, ctx ...any) {
 	if e := l.newEvent(PanicLevel, func(msg string) { panic(msg) }); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
 }
 
 // Crit logs a message at critical level (alias for Fatal).
-func (l *Logger) Crit(msg string, ctx ...any) {
+func (l Logger) Crit(msg string, ctx ...any) {
 	l.Fatal(msg, ctx...)
 }
 
 // Log logs a message at the specified level with optional key-value pairs.
-func (l *Logger) Log(level Level, msg string, ctx ...any) {
+func (l Logger) Log(level Level, msg string, ctx ...any) {
 	if e := l.newEvent(level, nil); e != nil {
 		applyContext(e, ctx).Msg(msg)
 	}
@@ -338,32 +356,32 @@ func (l *Logger) Log(level Level, msg string, ctx ...any) {
 
 // TraceEvent starts a new message with trace level.
 // You must call Msg on the returned event in order to send the event.
-func (l *Logger) TraceEvent() *Event {
+func (l Logger) TraceEvent() *Event {
 	return l.newEvent(TraceLevel, nil)
 }
 
 // DebugEvent starts a new message with debug level.
-func (l *Logger) DebugEvent() *Event {
+func (l Logger) DebugEvent() *Event {
 	return l.newEvent(DebugLevel, nil)
 }
 
 // InfoEvent starts a new message with info level.
-func (l *Logger) InfoEvent() *Event {
+func (l Logger) InfoEvent() *Event {
 	return l.newEvent(InfoLevel, nil)
 }
 
 // WarnEvent starts a new message with warn level.
-func (l *Logger) WarnEvent() *Event {
+func (l Logger) WarnEvent() *Event {
 	return l.newEvent(WarnLevel, nil)
 }
 
 // ErrorEvent starts a new message with error level.
-func (l *Logger) ErrorEvent() *Event {
+func (l Logger) ErrorEvent() *Event {
 	return l.newEvent(ErrorLevel, nil)
 }
 
 // FatalEvent starts a new message with fatal level.
-func (l *Logger) FatalEvent() *Event {
+func (l Logger) FatalEvent() *Event {
 	return l.newEvent(FatalLevel, func(msg string) {
 		if closer, ok := l.w.(io.Closer); ok {
 			closer.Close()
@@ -373,12 +391,12 @@ func (l *Logger) FatalEvent() *Event {
 }
 
 // PanicEvent starts a new message with panic level.
-func (l *Logger) PanicEvent() *Event {
+func (l Logger) PanicEvent() *Event {
 	return l.newEvent(PanicLevel, func(msg string) { panic(msg) })
 }
 
 // Err starts a new message with error level with err as a field if not nil.
-func (l *Logger) Err(err error) *Event {
+func (l Logger) Err(err error) *Event {
 	if err != nil {
 		return l.ErrorEvent().Err(err)
 	}
@@ -386,7 +404,7 @@ func (l *Logger) Err(err error) *Event {
 }
 
 // WithLevel starts a new message with the specified level.
-func (l *Logger) WithLevel(level Level) *Event {
+func (l Logger) WithLevel(level Level) *Event {
 	switch level {
 	case TraceLevel:
 		return l.TraceEvent()
@@ -412,19 +430,19 @@ func (l *Logger) WithLevel(level Level) *Event {
 }
 
 // LogEvent starts a new message with no level.
-func (l *Logger) LogEvent() *Event {
+func (l Logger) LogEvent() *Event {
 	return l.newEvent(NoLevel, nil)
 }
 
 // Print sends a log event using debug level.
-func (l *Logger) Print(v ...interface{}) {
+func (l Logger) Print(v ...interface{}) {
 	if e := l.DebugEvent(); e.Enabled() {
 		e.CallerSkipFrame(1).Msg(fmt.Sprint(v...))
 	}
 }
 
 // Printf sends a log event using debug level.
-func (l *Logger) Printf(format string, v ...interface{}) {
+func (l Logger) Printf(format string, v ...interface{}) {
 	if e := l.DebugEvent(); e.Enabled() {
 		e.CallerSkipFrame(1).Msg(fmt.Sprintf(format, v...))
 	}
@@ -440,7 +458,7 @@ func (l Logger) Write(p []byte) (n int, err error) {
 	return
 }
 
-func (l *Logger) newEvent(level Level, done func(string)) *Event {
+func (l Logger) newEvent(level Level, done func(string)) *Event {
 	enabled := l.should(level)
 	if !enabled {
 		if done != nil {
@@ -459,11 +477,11 @@ func (l *Logger) newEvent(level Level, done func(string)) *Event {
 	return e
 }
 
-func (l *Logger) scratchEvent() *Event {
+func (l Logger) scratchEvent() *Event {
 	return newEvent(LevelWriterAdapter{io.Discard}, DebugLevel, l.stack, l.ctx, l.hooks)
 }
 
-func (l *Logger) should(lvl Level) bool {
+func (l Logger) should(lvl Level) bool {
 	if l.w == nil {
 		return false
 	}
