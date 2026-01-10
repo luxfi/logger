@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Lux Partners Limited. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package log provides a global logger for zerolog-style logging.
+// Package log provides a global logger for chaining-style logging.
 // Import this package for convenient access to the global logger.
 //
 //	import "github.com/luxfi/logger/log"

@@ -6,7 +6,7 @@ A high-performance, zero-allocation structured logging library for the Lux ecosy
 
 - **Blazing fast**: ~8ns/op for empty log, zero allocations
 - **Zero allocation**: Uses sync.Pool for Event recycling
-- **Two logging styles**: Zerolog chaining API + geth-style traditional API
+- **Two logging styles**: Chaining API + traditional API (geth-compatible)
 - **Structured logging**: Type-safe field constructors
 - **Leveled logging**: Trace, Debug, Info, Warn, Error, Fatal, Panic
 - **Contextual fields**: Pre-set fields via `With()`
@@ -22,7 +22,7 @@ go get github.com/luxfi/logger
 
 ## Quick Start
 
-### Zerolog-style (Chaining API)
+### Chaining API
 
 ```go
 import "github.com/luxfi/logger/log"
@@ -40,7 +40,7 @@ log.Info().
 log.Logger = log.Output(os.Stdout).With().Timestamp().Logger()
 ```
 
-### Geth-style (Traditional API)
+### Traditional API (geth-compatible)
 
 ```go
 import "github.com/luxfi/logger"
@@ -106,7 +106,7 @@ log := logger.New(os.Stdout).Level(logger.InfoLevel)
 
 ## Field Types
 
-### Zerolog-style (on Event)
+### Chaining API (on Event)
 
 ```go
 event.Str("key", "value")
@@ -122,16 +122,16 @@ event.Strs("key", []string{})
 event.Ints("key", []int{})
 ```
 
-### Geth-style (Field constructors)
+### Traditional API (Field constructors)
 
 ```go
-logger.String("key", "value")
+logger.String("key", "value")  // or logger.Str("key", "value")
 logger.Int("key", 42)
 logger.Float64("key", 3.14)
 logger.Bool("key", true)
 logger.Err(err)
 logger.Time("key", time.Now())
-logger.Duration("key", time.Second)
+logger.Duration("key", time.Second)  // or logger.Dur("key", time.Second)
 logger.Any("key", obj)
 logger.Binary("key", []byte{})
 ```
@@ -141,7 +141,7 @@ logger.Binary("key", []byte{})
 Pre-set fields for all log messages:
 
 ```go
-// Zerolog-style
+// Chaining API
 log := logger.New(os.Stdout).With().
     Str("service", "api").
     Str("version", "1.0.0").
@@ -149,7 +149,7 @@ log := logger.New(os.Stdout).With().
 
 log.Info().Msg("request") // includes service and version
 
-// Geth-style
+// Traditional API
 logger.SetDefault(log)
 logger.Info("request") // includes service and version
 ```
@@ -189,8 +189,8 @@ log := logger.New(os.Stdout).Hook(SeverityHook{})
 
 ## Sub-packages
 
-- `github.com/luxfi/logger` - Core package with geth-style API
-- `github.com/luxfi/logger/log` - Global logger with zerolog-style API
+- `github.com/luxfi/logger` - Core package with traditional API
+- `github.com/luxfi/logger/log` - Global logger with chaining API
 
 ## Why not just use zerolog?
 

@@ -40,6 +40,11 @@ func Any(key string, val interface{}) Field     { return Field{Key: key, Value: 
 func Binary(key string, val []byte) Field       { return Field{Key: key, Value: val} }
 func ByteString(key string, val []byte) Field   { return Field{Key: key, Value: string(val)} }
 
+// Short-form aliases (matching chaining API style)
+func Str(key, val string) Field                 { return String(key, val) }
+func Dur(key string, val time.Duration) Field   { return Duration(key, val) }
+func AnErr(key string, err error) Field         { return NamedErr(key, err) }
+
 // Stack returns a Field with the current stack trace.
 func Stack(key string) Field {
 	return Field{Key: key, Value: "stack"} // Placeholder, actual stack in event

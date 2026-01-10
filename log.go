@@ -1,4 +1,4 @@
-// Package zerolog provides a lightweight logging library dedicated to JSON logging.
+// Package logger provides a lightweight logging library dedicated to JSON logging.
 //
 // A global Logger can be use for simple logging:
 //
@@ -173,7 +173,7 @@ func (l Level) String() string {
 	return strconv.Itoa(int(l))
 }
 
-// ParseLevel converts a level string into a zerolog Level value.
+// ParseLevel converts a level string into a logger Level value.
 // returns an error if the input string does not match known values.
 func ParseLevel(levelStr string) (Level, error) {
 	switch {
