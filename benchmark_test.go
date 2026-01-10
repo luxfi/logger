@@ -1,14 +1,12 @@
 package logger
 
 import (
-	"errors"
 	"io"
 	"testing"
 	"time"
 )
 
 var (
-	errExample  = errors.New("fail")
 	fakeMessage = "Test logging, but use a somewhat realistic message length."
 )
 

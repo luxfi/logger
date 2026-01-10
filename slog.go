@@ -139,7 +139,7 @@ func (l *slogLogger) Write(level slog.Level, msg string, attrs ...any) {
 	}
 	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
 	r.Add(attrs...)
-	l.inner.Handler().Handle(context.Background(), r)
+	_ = l.inner.Handler().Handle(context.Background(), r)
 }
 
 func (l *slogLogger) Log(level slog.Level, msg string, attrs ...any) {
@@ -428,7 +428,7 @@ func (h *TerminalHandler) Handle(_ context.Context, r slog.Record) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	buf := h.format(h.buf, r, h.useColor)
-	h.wr.Write(buf)
+	_, _ = h.wr.Write(buf)
 	h.buf = buf[:0]
 	return nil
 }

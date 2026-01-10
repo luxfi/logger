@@ -6,8 +6,14 @@ package logger
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
+
+// FormatLogfmtUint64 formats a uint64 as a compact logfmt string.
+func FormatLogfmtUint64(n uint64) string {
+	return strconv.FormatUint(n, 10)
+}
 
 // Level aliases for geth compatibility have been moved to slog.go
 // to avoid duplicate declarations.

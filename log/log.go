@@ -26,6 +26,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/luxfi/logger"
@@ -49,21 +50,22 @@ type Logger interface {
 	New(ctx ...interface{}) Logger
 
 	// Enabled returns true if the given level is enabled.
-	Enabled(level Level) bool
+	Enabled(ctx context.Context, level Level) bool
 }
 
-// Level represents log level.
-type Level = logger.Level
+// Level represents log level (slog.Level for geth/coreth compatibility).
+type Level = slog.Level
 
-// Log levels.
+// Log levels as slog.Level for geth/coreth compatibility.
 const (
-	LevelTrace = logger.TraceLevel
-	LevelDebug = logger.DebugLevel
-	LevelInfo  = logger.InfoLevel
-	LevelWarn  = logger.WarnLevel
-	LevelError = logger.ErrorLevel
-	LevelFatal = logger.FatalLevel
-	LevelPanic = logger.PanicLevel
+	LevelTrace Level = logger.SlogLevelTrace
+	LevelDebug Level = slog.LevelDebug
+	LevelInfo  Level = slog.LevelInfo
+	LevelWarn  Level = slog.LevelWarn
+	LevelError Level = slog.LevelError
+	LevelCrit  Level = logger.SlogLevelCrit
+	LevelFatal Level = logger.SlogLevelCrit // Alias for LevelCrit
+	LevelPanic Level = logger.SlogLevelCrit // Alias for LevelCrit
 )
 
 // baseLogger is the underlying zerolog logger.
@@ -404,8 +406,8 @@ func (z *zeroLogWrapper) New(ctx ...interface{}) Logger {
 	return z.With(ctx...)
 }
 
-func (z *zeroLogWrapper) Enabled(level Level) bool {
-	return z.l.GetLevel() <= level
+func (z *zeroLogWrapper) Enabled(ctx context.Context, level Level) bool {
+	return z.l.Enabled(ctx, level)
 }
 
 // NoLog is a no-op logger implementation.
@@ -421,7 +423,7 @@ func (n NoLog) Panic(msg string, args ...interface{}) {}
 func (n NoLog) Verbo(msg string, args ...interface{}) {}
 func (n NoLog) With(args ...interface{}) Logger       { return n }
 func (n NoLog) New(ctx ...interface{}) Logger         { return n }
-func (n NoLog) Enabled(level Level) bool              { return false }
+func (n NoLog) Enabled(ctx context.Context, level Level) bool { return false }
 
 // Global logging functions
 
@@ -477,12 +479,28 @@ func With() logger.Context {
 
 // SetGlobalLevel sets the global log level.
 func SetGlobalLevel(level Level) {
-	logger.SetGlobalLevel(level)
+	// Convert slog.Level to logger.Level
+	var internalLevel logger.Level
+	switch {
+	case level <= logger.SlogLevelTrace:
+		internalLevel = logger.TraceLevel
+	case level <= slog.LevelDebug:
+		internalLevel = logger.DebugLevel
+	case level <= slog.LevelInfo:
+		internalLevel = logger.InfoLevel
+	case level <= slog.LevelWarn:
+		internalLevel = logger.WarnLevel
+	case level <= slog.LevelError:
+		internalLevel = logger.ErrorLevel
+	default:
+		internalLevel = logger.FatalLevel
+	}
+	logger.SetGlobalLevel(internalLevel)
 }
 
 // ToLevel converts a string to a Level.
 func ToLevel(s string) (Level, error) {
-	return logger.ParseLevel(s)
+	return logger.LvlFromString(s)
 }
 
 // Ctx returns the Logger associated with the ctx.
@@ -512,6 +530,188 @@ func Root() Logger {
 }
 
 // SetDefault sets the default logger.
-func SetDefault(l Logger) {
-	L = l
+// Accepts both Logger and SlogLogger interfaces.
+func SetDefault(l interface{}) {
+	switch v := l.(type) {
+	case Logger:
+		L = v
+	case SlogLogger:
+		L = &slogLoggerWrapper{l: v}
+		logger.SetSlogDefault(v)
+	default:
+		// Fallback: try to use as Logger
+		if logger, ok := l.(Logger); ok {
+			L = logger
+		}
+	}
+}
+
+// LogFormat represents the format of log output.
+type LogFormat int
+
+const (
+	// Plain is plain text format.
+	Plain LogFormat = iota
+	// JSON is JSON format.
+	JSON
+)
+
+// Config represents the logging configuration.
+type Config struct {
+	Directory               string
+	LogLevel                Level
+	DisplayLevel            Level
+	LogFormat               LogFormat
+	DisableWriterDisplaying bool
+	MaxSize                 int
+	MaxFiles                int
+	MaxAge                  int
+	Compress                bool
+}
+
+// ToFormat converts a string to a LogFormat.
+func ToFormat(s string, fd uintptr) (LogFormat, error) {
+	switch s {
+	case "plain", "text", "":
+		return Plain, nil
+	case "json":
+		return JSON, nil
+	default:
+		return Plain, fmt.Errorf("unknown log format: %s", s)
+	}
+}
+
+// Re-exports for geth/coreth slog compatibility
+
+// GlogHandler type alias.
+type GlogHandler = logger.GlogHandler
+
+// TerminalHandler type alias.
+type TerminalHandler = logger.TerminalHandler
+
+// SlogLogger interface re-export.
+type SlogLogger = logger.SlogLogger
+
+// NewGlogHandler creates a new GlogHandler wrapping the given handler.
+func NewGlogHandler(h slog.Handler) *GlogHandler {
+	return logger.NewGlogHandler(h)
+}
+
+// NewTerminalHandler returns a handler which formats log records for human readability.
+func NewTerminalHandler(wr io.Writer, useColor bool) *TerminalHandler {
+	return logger.NewTerminalHandler(wr, useColor)
+}
+
+// NewTerminalHandlerWithLevel returns a terminal handler with level filtering.
+func NewTerminalHandlerWithLevel(wr io.Writer, lvl slog.Leveler, useColor bool) *TerminalHandler {
+	return logger.NewTerminalHandlerWithLevel(wr, lvl, useColor)
+}
+
+// JSONHandler returns a handler which prints records in JSON format.
+func JSONHandler(wr io.Writer) slog.Handler {
+	return logger.JSONHandler(wr)
+}
+
+// JSONHandlerWithLevel returns a JSON handler with level filtering.
+func JSONHandlerWithLevel(wr io.Writer, level slog.Leveler) slog.Handler {
+	return logger.JSONHandlerWithLevel(wr, level)
+}
+
+// LogfmtHandler returns a handler which prints records in logfmt format.
+func LogfmtHandler(wr io.Writer) slog.Handler {
+	return logger.LogfmtHandler(wr)
+}
+
+// LogfmtHandlerWithLevel returns a logfmt handler with level filtering.
+func LogfmtHandlerWithLevel(wr io.Writer, level slog.Leveler) slog.Handler {
+	return logger.LogfmtHandlerWithLevel(wr, level)
+}
+
+// DiscardHandler returns a no-op handler.
+func DiscardHandler() slog.Handler {
+	return logger.DiscardHandler()
+}
+
+// FromLegacyLevel converts old geth verbosity level to slog.Level.
+func FromLegacyLevel(lvl int) slog.Level {
+	return logger.FromLegacyLevel(lvl)
+}
+
+// LevelAlignedString returns a 5-character string containing the name of a level.
+func LevelAlignedString(l slog.Level) string {
+	return logger.LevelAlignedString(l)
+}
+
+// LevelString returns a string containing the name of a level.
+func LevelString(l slog.Level) string {
+	return logger.LevelString(l)
+}
+
+// NewLogger creates a new SlogLogger with the given handler.
+func NewSlogLogger(h slog.Handler) SlogLogger {
+	return logger.NewLogger(h)
+}
+
+// NewLoggerFromHandler creates a new SlogLogger from a slog.Handler.
+func NewLoggerFromHandler(h slog.Handler) SlogLogger {
+	return logger.NewLoggerFromHandler(h)
+}
+
+// SlogRoot returns the root slog-based logger.
+func SlogRoot() SlogLogger {
+	return logger.SlogRoot()
+}
+
+// SetSlogDefault sets the default slog-based logger.
+func SetSlogDefault(l SlogLogger) {
+	logger.SetSlogDefault(l)
+	// Also set as the default Logger
+	L = &slogLoggerWrapper{l: l}
+}
+
+// slogLoggerWrapper wraps SlogLogger to implement Logger interface.
+type slogLoggerWrapper struct {
+	l SlogLogger
+}
+
+func (w *slogLoggerWrapper) Trace(msg string, args ...interface{}) { w.l.Trace(msg, args...) }
+func (w *slogLoggerWrapper) Debug(msg string, args ...interface{}) { w.l.Debug(msg, args...) }
+func (w *slogLoggerWrapper) Info(msg string, args ...interface{})  { w.l.Info(msg, args...) }
+func (w *slogLoggerWrapper) Warn(msg string, args ...interface{})  { w.l.Warn(msg, args...) }
+func (w *slogLoggerWrapper) Error(msg string, args ...interface{}) { w.l.Error(msg, args...) }
+func (w *slogLoggerWrapper) Fatal(msg string, args ...interface{}) { w.l.Crit(msg, args...) }
+func (w *slogLoggerWrapper) Panic(msg string, args ...interface{}) { w.l.Crit(msg, args...) }
+func (w *slogLoggerWrapper) Verbo(msg string, args ...interface{}) { w.l.Trace(msg, args...) }
+func (w *slogLoggerWrapper) With(args ...interface{}) Logger       { return &slogLoggerWrapper{l: w.l.With(args...)} }
+func (w *slogLoggerWrapper) New(ctx ...interface{}) Logger         { return &slogLoggerWrapper{l: w.l.New(ctx...)} }
+func (w *slogLoggerWrapper) Enabled(ctx context.Context, level Level) bool { return w.l.Enabled(ctx, level) }
+
+// LvlFromString returns the appropriate level from a string name.
+func LvlFromString(lvlString string) (slog.Level, error) {
+	return logger.LvlFromString(lvlString)
+}
+
+// NewTestLogger returns a logger suitable for testing.
+func NewTestLogger(level ...Level) logger.Logger {
+	if len(level) > 0 {
+		// Convert slog.Level to logger.Level
+		var internalLevel logger.Level
+		lvl := level[0]
+		switch {
+		case lvl <= logger.SlogLevelTrace:
+			internalLevel = logger.TraceLevel
+		case lvl <= slog.LevelDebug:
+			internalLevel = logger.DebugLevel
+		case lvl <= slog.LevelInfo:
+			internalLevel = logger.InfoLevel
+		case lvl <= slog.LevelWarn:
+			internalLevel = logger.WarnLevel
+		case lvl <= slog.LevelError:
+			internalLevel = logger.ErrorLevel
+		default:
+			internalLevel = logger.FatalLevel
+		}
+		return logger.NewTestLogger(internalLevel)
+	}
+	return logger.NewTestLogger()
 }
