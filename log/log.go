@@ -767,27 +767,11 @@ func InitLogger(chainAlias string, logLevel string, jsonFormat bool, writer io.W
 }
 
 // NewTestLogger returns a logger suitable for testing.
-func NewTestLogger(level ...Level) Logger {
+// Accepts logger.Level (int8) for compatibility with level package.
+func NewTestLogger(level ...logger.Level) Logger {
 	var l logger.Logger
 	if len(level) > 0 {
-		// Convert slog.Level to logger.Level
-		var internalLevel logger.Level
-		lvl := level[0]
-		switch {
-		case lvl <= logger.SlogLevelTrace:
-			internalLevel = logger.TraceLevel
-		case lvl <= slog.LevelDebug:
-			internalLevel = logger.DebugLevel
-		case lvl <= slog.LevelInfo:
-			internalLevel = logger.InfoLevel
-		case lvl <= slog.LevelWarn:
-			internalLevel = logger.WarnLevel
-		case lvl <= slog.LevelError:
-			internalLevel = logger.ErrorLevel
-		default:
-			internalLevel = logger.FatalLevel
-		}
-		l = logger.NewTestLogger(internalLevel)
+		l = logger.NewTestLogger(level[0])
 	} else {
 		l = logger.NewTestLogger()
 	}
