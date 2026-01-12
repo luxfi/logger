@@ -1,4 +1,4 @@
-package logger
+package log
 
 // Hook defines an interface to a log hook.
 type Hook interface {

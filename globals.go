@@ -1,4 +1,4 @@
-package logger
+package log
 
 import (
 	"bytes"
@@ -136,7 +136,7 @@ var (
 
 	// DefaultContextLogger is returned from Ctx() if there is no logger associated
 	// with the context.
-	DefaultContextLogger *Logger
+	DefaultContextLogger Logger
 
 	// LevelColors are used by ConsoleWriter's consoleDefaultFormatLevel to color
 	// log levels.
@@ -201,4 +201,41 @@ func DisableSampling(v bool) {
 
 func samplingDisabled() bool {
 	return atomic.LoadInt32(disableSampling) == 1
+}
+
+// Color represents an ANSI color code for terminal output
+type Color int
+
+// Color constants for terminal output
+const (
+	Reset       Color = 0
+	Bold        Color = 1
+	Black       Color = 30
+	Red         Color = 31
+	Green       Color = 32
+	Yellow      Color = 33
+	Blue        Color = 34
+	Purple      Color = 35
+	Cyan        Color = 36
+	LightGray   Color = 37
+	DarkGray    Color = 90
+	LightRed    Color = 91
+	LightGreen  Color = 92
+	LightYellow Color = 93
+	LightBlue   Color = 94
+	LightPurple Color = 95
+	LightCyan   Color = 96
+	White       Color = 97
+	Orange      Color = 208 // 256-color mode orange
+)
+
+// Wrap wraps the given string with ANSI color codes
+func (c Color) Wrap(s string) string {
+	// For 256-color codes (values >= 100 typically), use extended format
+	// Standard 8/16 colors use simple \x1b[Nm format
+	// 256-color uses \x1b[38;5;Nm format
+	if c >= 100 {
+		return "\x1b[38;5;" + strconv.Itoa(int(c)) + "m" + s + "\x1b[0m"
+	}
+	return "\x1b[" + strconv.Itoa(int(c)) + "m" + s + "\x1b[0m"
 }

@@ -1,5 +1,5 @@
 // +build !go1.12
 
-package logger
+package log
 
 const contextCallerSkipFrameCount = 3

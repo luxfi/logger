@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Lux Partners Limited. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package logger
+package log
 
 import (
 	"fmt"
@@ -49,6 +49,16 @@ func Any(key string, val interface{}) Field     { return Field{Key: key, Value: 
 func Binary(key string, val []byte) Field       { return Field{Key: key, Value: val} }
 func ByteString(key string, val []byte) Field   { return Field{Key: key, Value: string(val)} }
 
+// Slice field constructors
+func Strings(key string, val []string) Field    { return Field{Key: key, Value: val} }
+func Ints(key string, val []int) Field          { return Field{Key: key, Value: val} }
+func Int64s(key string, val []int64) Field      { return Field{Key: key, Value: val} }
+func Uint64s(key string, val []uint64) Field    { return Field{Key: key, Value: val} }
+func Float64s(key string, val []float64) Field  { return Field{Key: key, Value: val} }
+func Bools(key string, val []bool) Field        { return Field{Key: key, Value: val} }
+func Durations(key string, val []time.Duration) Field { return Field{Key: key, Value: val} }
+func Times(key string, val []time.Time) Field   { return Field{Key: key, Value: val} }
+
 // Short-form aliases (matching chaining API style)
 func Str(key, val string) Field                 { return String(key, val) }
 func Dur(key string, val time.Duration) Field   { return Duration(key, val) }
@@ -72,18 +82,82 @@ func Root() Logger {
 	return defaultLogger
 }
 
+// Default returns the default logger (alias for Root)
+func Default() Logger {
+	return defaultLogger
+}
+
+// UserString returns a Field for user-provided string values.
+// This is the same as String but semantically indicates user input.
+func UserString(key, val string) Field { return String(key, val) }
+
+// Reflect returns a Field that uses reflection for complex types.
+func Reflect(key string, val interface{}) Field { return Any(key, val) }
+
+// applyField applies a single Field to an Event.
+func applyField(e *Event, f Field) *Event {
+	switch v := f.Value.(type) {
+	case string:
+		return e.Str(f.Key, v)
+	case int:
+		return e.Int(f.Key, v)
+	case int64:
+		return e.Int64(f.Key, v)
+	case uint:
+		return e.Uint(f.Key, v)
+	case uint64:
+		return e.Uint64(f.Key, v)
+	case float64:
+		return e.Float64(f.Key, v)
+	case bool:
+		return e.Bool(f.Key, v)
+	case time.Duration:
+		return e.Dur(f.Key, v)
+	case time.Time:
+		return e.Time(f.Key, v)
+	case error:
+		if v != nil {
+			return e.AnErr(f.Key, v)
+		}
+		return e
+	case []byte:
+		return e.Bytes(f.Key, v)
+	case fmt.Stringer:
+		if v != nil {
+			return e.Str(f.Key, v.String())
+		}
+		return e
+	default:
+		return e.Interface(f.Key, f.Value)
+	}
+}
+
 // applyContext applies geth-style key-value pairs to an Event.
 // Accepts alternating key-value pairs: key1, val1, key2, val2, ...
+// Also supports Field values directly (log.UserString, log.Reflect, etc.)
 func applyContext(e *Event, ctx []interface{}) *Event {
 	if e == nil {
 		return nil
 	}
-	for i := 0; i+1 < len(ctx); i += 2 {
+	for i := 0; i < len(ctx); {
+		// Check if this is a Field at key position (log.UserString, log.Reflect, etc.)
+		if f, ok := ctx[i].(Field); ok {
+			e = applyField(e, f)
+			i++
+			continue
+		}
+
+		// Otherwise, expect key-value pair
+		if i+1 >= len(ctx) {
+			break
+		}
 		key, ok := ctx[i].(string)
 		if !ok {
+			i++
 			continue
 		}
 		val := ctx[i+1]
+		i += 2
 		switch v := val.(type) {
 		case string:
 			e = e.Str(key, v)
@@ -128,15 +202,8 @@ func applyContext(e *Event, ctx []interface{}) *Event {
 				e = e.Str(key, v.String())
 			}
 		case Field:
-			// Support Field type for backward compatibility
-			switch fv := v.Value.(type) {
-			case string:
-				e = e.Str(v.Key, fv)
-			case error:
-				e = e.AnErr(v.Key, fv)
-			default:
-				e = e.Interface(v.Key, v.Value)
-			}
+			// Support Field type in value position for backward compatibility
+			e = applyField(e, v)
 		default:
 			e = e.Interface(key, v)
 		}
@@ -189,7 +256,7 @@ func Log(level Level, msg string, ctx ...interface{}) {
 
 // NewNoOpLogger returns a disabled logger.
 func NewNoOpLogger() Logger {
-	return Nop()
+	return Noop()
 }
 
 // NewTestLogger returns a logger suitable for testing.

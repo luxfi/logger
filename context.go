@@ -1,4 +1,4 @@
-package logger
+package log
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 // Context configures a new sub-logger with contextual fields.
 type Context struct {
-	l Logger
+	l *logger
 }
 
 // Logger returns the logger with the context previously set.
@@ -378,7 +378,7 @@ var th = timestampHook{}
 //
 // NOTE: It won't dedupe the "time" key if the *Context has one already.
 func (c Context) Timestamp() Context {
-	c.l = c.l.Hook(th)
+	c.l = c.l.hook(th)
 	return c
 }
 
@@ -460,7 +460,7 @@ var ch = newCallerHook(useGlobalSkipFrameCount)
 
 // Caller adds the file:line of the caller with the logger.CallerFieldName key.
 func (c Context) Caller() Context {
-	c.l = c.l.Hook(ch)
+	c.l = c.l.hook(ch)
 	return c
 }
 
@@ -468,7 +468,7 @@ func (c Context) Caller() Context {
 // The specified skipFrameCount int will override the global CallerSkipFrameCount for this context's respective logger.
 // If set to -1 the global CallerSkipFrameCount will be used.
 func (c Context) CallerWithSkipFrameCount(skipFrameCount int) Context {
-	c.l = c.l.Hook(newCallerHook(skipFrameCount))
+	c.l = c.l.hook(newCallerHook(skipFrameCount))
 	return c
 }
 

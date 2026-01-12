@@ -1,6 +1,6 @@
 //go:build !binary_log
 
-package logger
+package log
 
 // encoder_json.go file contains bindings to generate
 // JSON encoded byte stream.
@@ -8,7 +8,7 @@ package logger
 import (
 	"encoding/base64"
 
-	"github.com/luxfi/logger/internal/json"
+	"github.com/luxfi/log/internal/json"
 )
 
 var (
