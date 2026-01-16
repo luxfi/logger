@@ -116,14 +116,14 @@ func applyField(e *Event, f Field) *Event {
 	case time.Time:
 		return e.Time(f.Key, v)
 	case error:
-		if v != nil {
+		if !isNilValue(v) {
 			return e.AnErr(f.Key, v)
 		}
 		return e
 	case []byte:
 		return e.Bytes(f.Key, v)
 	case fmt.Stringer:
-		if v != nil {
+		if !isNilValue(v) {
 			return e.Str(f.Key, v.String())
 		}
 		return e
@@ -192,13 +192,13 @@ func applyContext(e *Event, ctx []interface{}) *Event {
 		case time.Time:
 			e = e.Time(key, v)
 		case error:
-			if v != nil {
+			if !isNilValue(v) {
 				e = e.AnErr(key, v)
 			}
 		case []byte:
 			e = e.Bytes(key, v)
 		case fmt.Stringer:
-			if v != nil {
+			if !isNilValue(v) {
 				e = e.Str(key, v.String())
 			}
 		case Field:

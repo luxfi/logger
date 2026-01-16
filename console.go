@@ -41,7 +41,7 @@ var (
 )
 
 const (
-	consoleDefaultTimeFormat = time.Kitchen
+	consoleDefaultTimeFormat = "3:04pm"
 )
 
 // Formatter transforms the input into a formatted string.

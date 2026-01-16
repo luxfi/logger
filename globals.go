@@ -142,7 +142,7 @@ var (
 	// log levels.
 	LevelColors = map[Level]int{
 		TraceLevel: colorBlue,
-		DebugLevel: 0,
+		DebugLevel: colorMagenta,
 		InfoLevel:  colorGreen,
 		WarnLevel:  colorYellow,
 		ErrorLevel: colorRed,
@@ -153,13 +153,13 @@ var (
 	// FormattedLevels are used by ConsoleWriter's consoleDefaultFormatLevel
 	// for a short level name.
 	FormattedLevels = map[Level]string{
-		TraceLevel: "TRC",
-		DebugLevel: "DBG",
-		InfoLevel:  "INF",
-		WarnLevel:  "WRN",
-		ErrorLevel: "ERR",
-		FatalLevel: "FTL",
-		PanicLevel: "PNC",
+		TraceLevel: "trace",
+		DebugLevel: "debug",
+		InfoLevel:  "info",
+		WarnLevel:  "warn",
+		ErrorLevel: "error",
+		FatalLevel: "fatal",
+		PanicLevel: "panic",
 	}
 
 	// TriggerLevelWriterBufferReuseLimit is a limit in bytes that a buffer is dropped

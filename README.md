@@ -161,7 +161,7 @@ output := logger.ConsoleWriter{Out: os.Stdout}
 log := logger.New(output)
 
 log.Info().Str("foo", "bar").Msg("Hello World")
-// Output: 3:04PM INF Hello World foo=bar
+// Output: 3:04pm INF Hello World foo=bar
 ```
 
 ## Sampling
