@@ -1,6 +1,6 @@
 module github.com/luxfi/log
 
-go 1.26
+go 1.26.1
 
 require (
 	github.com/mattn/go-colorable v0.1.14
