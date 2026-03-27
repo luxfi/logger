@@ -72,8 +72,12 @@ func Stack(key string) Field {
 	return Field{Key: key, Value: string(buf[:n])}
 }
 
-// defaultLogger is the global logger for geth-style functions
-var defaultLogger = NewWriter(os.Stderr).With().Timestamp().Logger()
+// defaultLogger is the global logger for geth-style functions.
+// Default level is Info — debug/trace messages are suppressed unless
+// explicitly enabled via SetDefault() or SetGlobalLevel(DebugLevel).
+// This prevents dependency init() functions from spamming stderr
+// with debug output before the application configures logging.
+var defaultLogger = NewWriter(os.Stderr).With().Timestamp().Logger().Level(InfoLevel)
 
 // SetDefault sets the default logger for geth-style functions
 func SetDefault(l Logger) {
