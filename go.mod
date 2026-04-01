@@ -8,4 +8,4 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require golang.org/x/sys v0.41.0 // indirect
+require golang.org/x/sys v0.42.0 // indirect
