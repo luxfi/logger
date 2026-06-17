@@ -1,4 +1,4 @@
-# LLM.md - Hanzo Log
+# Hanzo Log
 
 ## Overview
 Go module: github.com/luxfi/log
