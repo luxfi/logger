@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="log" width="880"></p>
+
 # Lux Logger
 
 A high-performance, zero-allocation structured logging library for the Lux ecosystem. Based on [zerolog](https://github.com/rs/zerolog) with additional geth-style API support.
