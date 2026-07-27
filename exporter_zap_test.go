@@ -124,5 +124,5 @@ func (s recordSink) OnEmit(_ context.Context, r *sdklog.Record) error {
 	return nil
 }
 func (s recordSink) Enabled(context.Context, sdklog.EnabledParameters) bool { return true }
-func (s recordSink) Shutdown(context.Context) error                        { return nil }
-func (s recordSink) ForceFlush(context.Context) error                      { return nil }
+func (s recordSink) Shutdown(context.Context) error                         { return nil }
+func (s recordSink) ForceFlush(context.Context) error                       { return nil }
