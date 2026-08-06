@@ -60,6 +60,14 @@ func Bools(key string, val []bool) Field              { return Field{Key: key, V
 func Durations(key string, val []time.Duration) Field { return Field{Key: key, Value: val} }
 func Times(key string, val []time.Time) Field         { return Field{Key: key, Value: val} }
 
+// Stringers carries a slice whose elements render through their own String
+// method. It is generic because a []T is not assignable to a []fmt.Stringer,
+// so a plain interface-slice parameter would reject every concrete slice a
+// caller actually holds. Context.Stringers and Event.Stringers take
+// []fmt.Stringer instead only because Go has no generic methods — this is the
+// one spelling that can accept both.
+func Stringers[T fmt.Stringer](key string, val []T) Field { return Field{Key: key, Value: val} }
+
 // Short-form aliases (matching chaining API style)
 func Str(key, val string) Field               { return String(key, val) }
 func Dur(key string, val time.Duration) Field { return Duration(key, val) }
