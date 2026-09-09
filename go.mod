@@ -1,6 +1,6 @@
 module github.com/luxfi/log
 
-go 1.26.4
+go 1.26.8
 
 require (
 	github.com/luxfi/zap v1.2.6
